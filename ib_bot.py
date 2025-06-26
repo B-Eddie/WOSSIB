@@ -53,22 +53,25 @@ async def on_ready():
         print(f'  - {guild.name} (ID: {guild.id})')
     
     try:
-        # Try to sync commands globally first
-        synced = await bot.tree.sync()
-        print(f"Synced {len(synced)} global command(s)")
-        
-        # Also try to sync to specific guild if GUILD_ID is set
+        # Only sync to specific guild if GUILD_ID is set (prevents duplicates)
         guild_id = os.getenv('GUILD_ID')
         if guild_id:
             guild = discord.Object(id=int(guild_id))
-            bot.tree.copy_global_to(guild=guild)
             synced_guild = await bot.tree.sync(guild=guild)
             print(f"Synced {len(synced_guild)} command(s) to guild {guild_id}")
-        
-        # List all commands that were synced
-        for command in synced:
-            print(f"  Command: /{command.name} - {command.description}")
             
+            # List all commands that were synced
+            for command in synced_guild:
+                print(f"  Command: /{command.name} - {command.description}")
+        else:
+            # Fallback to global sync only if no guild ID is set
+            synced = await bot.tree.sync()
+            print(f"Synced {len(synced)} global command(s)")
+            
+            # List all commands that were synced
+            for command in synced:
+                print(f"  Command: /{command.name} - {command.description}")
+        
     except discord.Forbidden:
         print("❌ Bot doesn't have permission to sync commands!")
         print("Make sure the bot was invited with 'applications.commands' scope")
@@ -82,7 +85,7 @@ async def on_ready():
     update_exam_countdowns.start()
 
 # Focus Mode Commands
-@bot.tree.command(name="focus", description="Start a focus session")
+@bot.tree.command(name="focus", description="Start a focus session (duration in minutes)")
 async def focus_start(interaction: discord.Interaction, duration: int, mode: str = "deep"):
     """
     Start a focus session
@@ -157,7 +160,7 @@ async def unfocus(interaction: discord.Interaction):
     
     session_data = focus_sessions[user_id]
     
-    # Remove role
+    # Remove focus session role
     try:
         await interaction.user.remove_roles(session_data['role'], reason="Focus session ended manually")
     except discord.Forbidden:
@@ -211,6 +214,63 @@ async def focus_status(interaction: discord.Interaction):
     )
     
     await interaction.response.send_message(embed=embed, ephemeral=True)
+
+@bot.tree.command(name="focus_list", description="Show all users currently in focus mode")
+async def focus_list(interaction: discord.Interaction):
+    """Show all users currently in focus mode"""
+    if not focus_sessions:
+        embed = discord.Embed(
+            title="🎯 Focus Mode Status",
+            description="No users are currently in focus mode.",
+            color=discord.Color.blue()
+        )
+        await interaction.response.send_message(embed=embed)
+        return
+    
+    embed = discord.Embed(
+        title="🎯 Users in Focus Mode",
+        color=discord.Color.orange()
+    )
+    
+    current_time = datetime.now()
+    active_sessions = []
+    
+    for user_id, session_data in focus_sessions.items():
+        time_remaining = session_data['end_time'] - current_time
+        
+        if time_remaining.total_seconds() > 0:
+            minutes_remaining = int(time_remaining.total_seconds() / 60)
+            user = session_data['user']
+            mode = session_data['mode'].title()
+            
+            active_sessions.append({
+                'user': user,
+                'minutes_remaining': minutes_remaining,
+                'mode': mode,
+                'end_time': session_data['end_time']
+            })
+    
+    if not active_sessions:
+        embed.description = "No active focus sessions found."
+    else:
+        # Sort by time remaining (shortest first)
+        active_sessions.sort(key=lambda x: x['minutes_remaining'])
+        
+        for session in active_sessions:
+            user = session['user']
+            minutes = session['minutes_remaining']
+            mode = session['mode']
+            end_time = session['end_time']
+            
+            embed.add_field(
+                name=f"👤 {user.display_name}",
+                value=f"**Mode:** {mode}\n**Time Left:** {minutes} minutes\n**Ends:** <t:{int(end_time.timestamp())}:t>",
+                inline=True
+            )
+    
+    embed.set_footer(text=f"Total active sessions: {len(active_sessions)}")
+    
+    await interaction.response.send_message(embed=embed)
 
 # IB Score Conversion Commands
 @bot.tree.command(name="ib_to_percent", description="Convert IB grade to percentage")
@@ -444,7 +504,7 @@ async def check_focus_sessions():
         session_data = focus_sessions[user_id]
         user = session_data['user']
         
-        # Remove focus role
+        # Remove focus session role
         try:
             await user.remove_roles(session_data['role'], reason="Focus session completed")
         except:
