@@ -16,7 +16,7 @@ intents.message_content = True
 intents.guilds = True
 intents.members = True
 
-bot = commands.Bot(command_prefix=None, intents=intents)
+bot = commands.Bot(command_prefix="!", intents=intents)  # Changed from None to "!"
 
 # Data storage (in production, use a proper database)
 focus_sessions = {}
@@ -102,6 +102,14 @@ SUBJECT_CONVERSIONS = {
     "economics_sl": {
         0: 0, 1: 4, 2: 7, 3: 11, 4: 14, 5: 18, 6: 21, 7: 25, 8: 28, 9: 32, 10: 35, 11: 39, 12: 42, 13: 46, 14: 49,
         15: 50, 16: 50, 17: 51, 18: 51, 19: 52, 20: 53, 21: 54, 22: 55, 23: 56, 24: 57, 25: 58, 26: 59, 27: 60, 28: 61, 29: 62, 30: 63, 31: 64, 32: 65, 33: 66, 34: 67, 35: 68, 36: 69, 37: 70, 38: 71, 39: 72, 40: 73, 41: 74, 42: 72, 43: 73, 44: 74, 45: 75, 46: 76, 47: 77, 48: 78, 49: 79, 50: 84, 51: 84, 52: 85, 53: 85, 54: 86, 55: 86, 56: 87, 57: 87, 58: 88, 59: 88, 60: 89, 61: 93, 62: 93, 63: 93, 64: 93, 65: 94, 66: 94, 67: 94, 68: 95, 69: 95, 70: 95, 71: 96, 72: 96, 73: 96, 74: 97, 75: 97, 76: 97, 77: 97, 78: 97, 79: 97, 80: 97, 81: 97, 82: 97, 83: 97, 84: 98, 85: 98, 86: 98, 87: 98, 88: 98, 89: 98, 90: 99, 91: 99, 92: 99, 93: 99, 94: 99, 95: 99, 96: 100, 97: 100, 98: 100, 99: 100, 100: 100
+    },
+    "spanish_sl": {
+        0: 40, 1: 40, 2: 41, 3: 41, 4: 42, 5: 42, 6: 43, 7: 44, 8: 45, 9: 46, 10: 47, 11: 48, 12: 49,
+        13: 50, 14: 50, 15: 51, 16: 51, 17: 52, 18: 52, 19: 53, 20: 53, 21: 54, 22: 55, 23: 56, 24: 57, 25: 58, 26: 59, 27: 60, 28: 61, 29: 61, 30: 62, 31: 62, 32: 63, 33: 63, 34: 64, 35: 65, 36: 66, 37: 67, 38: 68, 39: 69, 40: 70, 41: 71, 42: 72, 43: 72, 44: 73, 45: 73, 46: 74, 47: 74, 48: 75, 49: 76, 50: 77, 51: 78, 52: 79, 53: 80, 54: 81, 55: 82, 56: 83, 57: 84, 58: 84, 59: 85, 60: 85, 61: 86, 62: 86, 63: 87, 64: 87, 65: 88, 66: 88, 67: 89, 68: 90, 69: 91, 70: 92, 71: 93, 72: 93, 73: 94, 74: 94, 75: 95, 76: 95, 77: 95, 78: 95, 79: 95, 80: 95, 81: 95, 82: 96, 83: 96, 84: 96, 85: 97, 86: 97, 87: 97, 88: 97, 89: 98, 90: 98, 91: 98, 92: 98, 93: 99, 94: 99, 95: 99, 96: 99, 97: 100, 98: 100, 99: 100, 100: 100
+    },
+    "business_sl": {
+        1: 1, 2: 3, 3: 6, 4: 9, 5: 13, 6: 16, 7: 19, 8: 22, 9: 25, 10: 28, 11: 31, 12: 34, 13: 37, 14: 40, 15: 43, 16: 46, 17: 49,
+        18: 50, 19: 50, 20: 51, 21: 51, 22: 52, 23: 52, 24: 53, 25: 53, 26: 54, 27: 54, 28: 55, 29: 55, 30: 56, 31: 57, 32: 58, 33: 59, 34: 60, 35: 61, 36: 62, 37: 63, 38: 64, 39: 65, 40: 66, 41: 67, 42: 68, 43: 69, 44: 70, 45: 71, 46: 72, 47: 72, 48: 74, 49: 75, 50: 77, 51: 78, 52: 79, 53: 80, 54: 81, 55: 82, 56: 83, 57: 84, 58: 84, 59: 85, 60: 85, 61: 86, 62: 87, 63: 88, 64: 89, 65: 90, 66: 91, 67: 92, 68: 93, 69: 93, 70: 94, 71: 94, 72: 94, 73: 94, 74: 95, 75: 95, 76: 96, 77: 96, 78: 97, 79: 97, 80: 97, 81: 97, 82: 97, 83: 97, 84: 97, 85: 97, 86: 98, 87: 98, 88: 98, 89: 98, 90: 98, 91: 98, 92: 98, 93: 99, 94: 99, 95: 99, 96: 99, 97: 100, 98: 100, 99: 100, 100: 100
     }
 }
 
@@ -239,6 +247,41 @@ async def on_ready():
     # Start exam countdown updater
     update_exam_countdowns.start()
 
+@bot.tree.error
+async def on_app_command_error(interaction: discord.Interaction, error: app_commands.AppCommandError):
+    """Handle errors in slash commands"""
+    if isinstance(error, app_commands.CommandInvokeError):
+        original_error = error.original
+        if isinstance(original_error, discord.NotFound):
+            # Interaction timed out
+            try:
+                await interaction.followup.send("⏰ The interaction timed out. Please try the command again.", ephemeral=True)
+            except:
+                pass
+        else:
+            # Other errors
+            try:
+                await interaction.followup.send(f"❌ An error occurred: {str(original_error)}", ephemeral=True)
+            except:
+                pass
+    else:
+        # App command errors
+        try:
+            await interaction.followup.send(f"❌ Command error: {str(error)}", ephemeral=True)
+        except:
+            pass
+
+@bot.event
+async def on_message(message):
+    """Handle regular messages - ignore them since we use slash commands"""
+    # Ignore messages from the bot itself
+    if message.author == bot.user:
+        return
+    
+    # Don't process commands for regular messages since we use slash commands
+    # This prevents the prefix errors
+    pass
+
 # Focus Mode Commands
 @bot.tree.command(name="focus", description="Start a focus session (duration in minutes)")
 @app_commands.describe(
@@ -254,9 +297,11 @@ async def on_ready():
     app_commands.Choice(name="Math", value="math"),
     app_commands.Choice(name="English", value="english"),
     app_commands.Choice(name="French", value="french"),
+    app_commands.Choice(name="Spanish", value="spanish"),
     app_commands.Choice(name="Geography", value="geography"),
     app_commands.Choice(name="History", value="history"),
     app_commands.Choice(name="Economics", value="economics"),
+    app_commands.Choice(name="Business", value="business"),
 ])
 async def focus_start(interaction: discord.Interaction, duration: int, mode: str = "deep"):
     """
@@ -463,17 +508,26 @@ async def focus_list(interaction: discord.Interaction):
     app_commands.Choice(name="English HL", value="english_hl"),
     app_commands.Choice(name="French SL", value="french_sl"),
     app_commands.Choice(name="French HL", value="french_hl"),
+    app_commands.Choice(name="Spanish SL", value="spanish_sl"),
     app_commands.Choice(name="Geography SL", value="geography_sl"),
     app_commands.Choice(name="Geography HL", value="geography_hl"),
     app_commands.Choice(name="History SL", value="history_sl"),
     app_commands.Choice(name="History HL", value="history_hl"),
     app_commands.Choice(name="Economics SL", value="economics_sl"),
     app_commands.Choice(name="Economics HL", value="economics_hl"),
+    app_commands.Choice(name="Business Management SL", value="business_sl"),
 ])
 async def raw_to_converted_cmd(interaction: discord.Interaction, raw_mark: int, subject: str):
     """Convert raw IB mark to Ontario percentage"""
     if raw_mark not in range(0, 101):
-        await interaction.response.send_message("❌ Raw mark must be between 0 and 100.", ephemeral=True)
+        try:
+            await interaction.response.send_message("❌ Raw mark must be between 0 and 100.", ephemeral=True)
+        except discord.NotFound:
+            # Interaction timed out, try to send a followup
+            try:
+                await interaction.followup.send("❌ Raw mark must be between 0 and 100.", ephemeral=True)
+            except:
+                pass
         return
     
     converted = raw_to_converted(raw_mark, subject)
@@ -490,7 +544,18 @@ async def raw_to_converted_cmd(interaction: discord.Interaction, raw_mark: int, 
         inline=False
     )
     
-    await interaction.response.send_message(embed=embed)
+    try:
+        await interaction.response.send_message(embed=embed)
+    except discord.NotFound:
+        # Interaction timed out, try to send a followup
+        try:
+            await interaction.followup.send(embed=embed)
+        except:
+            # If all else fails, try to send a DM
+            try:
+                await interaction.user.send(embed=embed)
+            except:
+                pass
 
 @bot.tree.command(name="ib_to_percent", description="Convert IB grade to percentage")
 @app_commands.describe(
@@ -595,12 +660,14 @@ async def percent_to_ib(interaction: discord.Interaction, percentage: int, subje
     app_commands.Choice(name="English HL", value="english_hl"),
     app_commands.Choice(name="French SL", value="french_sl"),
     app_commands.Choice(name="French HL", value="french_hl"),
+    app_commands.Choice(name="Spanish SL", value="spanish_sl"),
     app_commands.Choice(name="Geography SL", value="geography_sl"),
     app_commands.Choice(name="Geography HL", value="geography_hl"),
     app_commands.Choice(name="History SL", value="history_sl"),
     app_commands.Choice(name="History HL", value="history_hl"),
     app_commands.Choice(name="Economics SL", value="economics_sl"),
     app_commands.Choice(name="Economics HL", value="economics_hl"),
+    app_commands.Choice(name="Business Management SL", value="business_sl"),
 ])
 async def subject_conversion(interaction: discord.Interaction, subject: str):
     """Show the conversion table for a specific subject"""
@@ -647,8 +714,9 @@ async def list_subjects(interaction: discord.Interaction):
     
     # Group subjects by type
     sciences = [s for s in SUBJECT_CONVERSIONS.keys() if any(subj in s for subj in ['physics', 'chemistry', 'biology'])]
-    languages = [s for s in SUBJECT_CONVERSIONS.keys() if any(subj in s for subj in ['english', 'french'])]
+    languages = [s for s in SUBJECT_CONVERSIONS.keys() if any(subj in s for subj in ['english', 'french', 'spanish'])]
     humanities = [s for s in SUBJECT_CONVERSIONS.keys() if any(subj in s for subj in ['geography', 'history', 'economics'])]
+    business = [s for s in SUBJECT_CONVERSIONS.keys() if any(subj in s for subj in ['business'])]
     math = [s for s in SUBJECT_CONVERSIONS.keys() if 'math' in s]
     
     embed.add_field(
@@ -664,6 +732,11 @@ async def list_subjects(interaction: discord.Interaction):
     embed.add_field(
         name="🌍 Humanities",
         value="\n".join([f"• `{s}`" for s in sorted(humanities)]),
+        inline=True
+    )
+    embed.add_field(
+        name="📊 Business",
+        value="\n".join([f"• `{s}`" for s in sorted(business)]),
         inline=True
     )
     embed.add_field(
