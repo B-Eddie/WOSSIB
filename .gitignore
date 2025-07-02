@@ -47,6 +47,5 @@ Thumbs.db
 logs/
 
 # Bot data (if using file storage)
-data/
 *.db
 *.sqlite

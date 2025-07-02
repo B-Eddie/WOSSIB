@@ -6,6 +6,7 @@ from datetime import datetime, timedelta
 import json
 from dotenv import load_dotenv
 from discord import app_commands
+import glob
 
 # Load environment variables
 load_dotenv()
@@ -22,96 +23,99 @@ bot = commands.Bot(command_prefix="!", intents=intents)  # Changed from None to 
 focus_sessions = {}
 exam_dates = {}
 
-# IB Score conversion tables - WOSS IB specific conversions
-# Based on IB Conversions Master Document.csv
+# --- Load subject conversion tables from JSON files ---
+DATA_DIR = os.path.join(os.path.dirname(__file__), 'data')
 
-# Subject-specific raw to converted mark conversions
-# Format: {raw_mark: ontario_percentage}
-SUBJECT_CONVERSIONS = {
-    "chemistry_sl": {
-        0: 0, 1: 3, 2: 7, 3: 10, 4: 13, 5: 16, 6: 20, 7: 23, 8: 26, 9: 29, 10: 33, 11: 36, 12: 39, 13: 42, 14: 46, 15: 49,
-        16: 50, 17: 51, 18: 52, 19: 53, 20: 54, 21: 55, 22: 56, 23: 57, 24: 58, 25: 59, 26: 60, 27: 59, 28: 60, 29: 61,
-        30: 62, 31: 63, 32: 63, 33: 64, 34: 65, 35: 66, 36: 66, 37: 67, 38: 68, 39: 69, 40: 70, 41: 71, 42: 71, 43: 72,
-        44: 73, 45: 74, 46: 75, 47: 76, 48: 77, 49: 78, 50: 79, 51: 80, 52: 81, 53: 82, 54: 83, 55: 84, 56: 85, 57: 86, 58: 87, 59: 88, 60: 88,
-        61: 89, 62: 90, 63: 91, 64: 92, 65: 93, 66: 93, 67: 94, 68: 95, 69: 95, 70: 95, 71: 96, 72: 96, 73: 97, 74: 97, 75: 98, 76: 98, 77: 98, 78: 97, 79: 97, 80: 97, 81: 97, 82: 97, 83: 97, 84: 97, 85: 97, 86: 98, 87: 98, 88: 98, 89: 98, 90: 98, 91: 98, 92: 98, 93: 99, 94: 99, 95: 99, 96: 99, 97: 99, 98: 99, 99: 99, 100: 100
-    },
-    "chemistry_hl": {
-        0: 0, 1: 3, 2: 5, 3: 8, 4: 10, 5: 13, 6: 15, 7: 18, 8: 20, 9: 23, 10: 26, 11: 28, 12: 31, 13: 34, 14: 36, 15: 39, 16: 41, 17: 44, 18: 46, 19: 49,
-        20: 50, 21: 51, 22: 51, 23: 52, 24: 53, 25: 53, 26: 54, 27: 54, 28: 55, 29: 56, 30: 56, 31: 57, 32: 58, 33: 58, 34: 59, 35: 59, 36: 60, 37: 61, 38: 62, 39: 63, 40: 64, 41: 64, 42: 65, 43: 66, 44: 67, 45: 68, 46: 69, 47: 69, 48: 70, 49: 71, 50: 72, 51: 73, 52: 74, 53: 75, 54: 76, 55: 78, 56: 79, 57: 80, 58: 81, 59: 82, 60: 83, 61: 84, 62: 85, 63: 86, 64: 87, 65: 88, 66: 88, 67: 89, 68: 90, 69: 91, 70: 92, 71: 93, 72: 93, 73: 94, 74: 95, 75: 95, 76: 96, 77: 96, 78: 96, 79: 96, 80: 96, 81: 96, 82: 97, 83: 97, 84: 97, 85: 97, 86: 97, 87: 97, 88: 98, 89: 98, 90: 98, 91: 98, 92: 98, 93: 99, 94: 99, 95: 99, 96: 99, 97: 99, 98: 99, 99: 99, 100: 100
-    },
-    "biology_sl": {
-        0: 0, 1: 3, 2: 7, 3: 10, 4: 13, 5: 16, 6: 20, 7: 23, 8: 26, 9: 29, 10: 33, 11: 36, 12: 39, 13: 42, 14: 46, 15: 49,
-        16: 50, 17: 51, 18: 52, 19: 52, 20: 53, 21: 54, 22: 55, 23: 55, 24: 56, 25: 57, 26: 58, 27: 58, 28: 59, 29: 60, 30: 61, 31: 62, 32: 62, 33: 63, 34: 64, 35: 65, 36: 65, 37: 66, 38: 67, 39: 67, 40: 68, 41: 69, 42: 70, 43: 70, 44: 71, 45: 72, 46: 73, 47: 74, 48: 74, 49: 75, 50: 76, 51: 77, 52: 78, 53: 78, 54: 79, 55: 80, 56: 81, 57: 81, 58: 82, 59: 83, 60: 84, 61: 85, 62: 86, 63: 87, 64: 88, 65: 88, 66: 89, 67: 90, 68: 91, 69: 92, 70: 93, 71: 93, 72: 94, 73: 94, 74: 94, 75: 95, 76: 95, 77: 95, 78: 96, 79: 96, 80: 97, 81: 97, 82: 97, 83: 97, 84: 97, 85: 97, 86: 97, 87: 98, 88: 98, 89: 98, 90: 98, 91: 98, 92: 98, 93: 99, 94: 99, 95: 99, 96: 99, 97: 99, 98: 99, 99: 99, 100: 100
-    },
-    "biology_hl": {
-        0: 0, 1: 3, 2: 7, 3: 10, 4: 13, 5: 16, 6: 20, 7: 23, 8: 26, 9: 29, 10: 33, 11: 36, 12: 39, 13: 42, 14: 46, 15: 49,
-        16: 50, 17: 51, 18: 52, 19: 52, 20: 53, 21: 54, 22: 55, 23: 55, 24: 56, 25: 57, 26: 58, 27: 58, 28: 59, 29: 60, 30: 61, 31: 62, 32: 62, 33: 63, 34: 64, 35: 65, 36: 65, 37: 66, 38: 67, 39: 67, 40: 68, 41: 69, 42: 70, 43: 70, 44: 71, 45: 72, 46: 73, 47: 74, 48: 74, 49: 75, 50: 76, 51: 77, 52: 78, 53: 78, 54: 79, 55: 80, 56: 81, 57: 81, 58: 82, 59: 83, 60: 84, 61: 85, 62: 85, 63: 86, 64: 87, 65: 88, 66: 88, 67: 89, 68: 90, 69: 91, 70: 91, 71: 92, 72: 93, 73: 94, 74: 95, 75: 95, 76: 96, 77: 96, 78: 96, 79: 96, 80: 96, 81: 97, 82: 97, 83: 97, 84: 97, 85: 97, 86: 97, 87: 98, 88: 98, 89: 98, 90: 98, 91: 98, 92: 98, 93: 99, 94: 99, 95: 99, 96: 99, 97: 99, 98: 99, 99: 99, 100: 100
-    },
-    "physics_sl": {
-        0: 0, 1: 4, 2: 7, 3: 11, 4: 14, 5: 18, 6: 21, 7: 25, 8: 28, 9: 32, 10: 35, 11: 39, 12: 42, 13: 46, 14: 49,
-        15: 50, 16: 51, 17: 52, 18: 53, 19: 54, 20: 55, 21: 56, 22: 57, 23: 58, 24: 59, 25: 60, 26: 61, 27: 62, 28: 63, 29: 64, 30: 65, 31: 66, 32: 67, 33: 68, 34: 69, 35: 70, 36: 71, 37: 72, 38: 73, 39: 74, 40: 75, 41: 76, 42: 77, 43: 78, 44: 78, 45: 79, 46: 80, 47: 81, 48: 82, 49: 83, 50: 84, 51: 85, 52: 86, 53: 87, 54: 88, 55: 88, 56: 89, 57: 90, 58: 91, 59: 92, 60: 93, 61: 93, 62: 94, 63: 94, 64: 94, 65: 95, 66: 95, 67: 95, 68: 96, 69: 96, 70: 97, 71: 97, 72: 97, 73: 97, 74: 97, 75: 97, 76: 97, 77: 97, 78: 97, 79: 97, 80: 98, 81: 98, 82: 98, 83: 98, 84: 98, 85: 98, 86: 98, 87: 98, 88: 98, 89: 98, 90: 99, 91: 99, 92: 99, 93: 99, 94: 99, 95: 99, 96: 99, 97: 99, 98: 99, 99: 99, 100: 100
-    },
-    "geography_hl": {
-        0: 0, 1: 4, 2: 8, 3: 12, 4: 16, 5: 20, 6: 25, 7: 29, 8: 33, 9: 37, 10: 41, 11: 45, 12: 49,
-        13: 50, 14: 51, 15: 51, 16: 52, 17: 53, 18: 53, 19: 54, 20: 55, 21: 55, 22: 56, 23: 57, 24: 57, 25: 58, 26: 59, 27: 59, 28: 60, 29: 61, 30: 62, 31: 63, 32: 63, 33: 64, 34: 65, 35: 66, 36: 66, 37: 67, 38: 68, 39: 69, 40: 69, 41: 70, 42: 71, 43: 72, 44: 73, 45: 74, 46: 76, 47: 77, 48: 78, 49: 79, 50: 81, 51: 82, 52: 83, 53: 84, 54: 85, 55: 86, 56: 86, 57: 87, 58: 88, 59: 89, 60: 90, 61: 90, 62: 91, 63: 92, 64: 93, 65: 93, 66: 94, 67: 94, 68: 94, 69: 95, 70: 95, 71: 95, 72: 95, 73: 96, 74: 96, 75: 97, 76: 97, 77: 97, 78: 97, 79: 97, 80: 97, 81: 97, 82: 97, 83: 98, 84: 98, 85: 98, 86: 98, 87: 98, 88: 98, 89: 98, 90: 99, 91: 99, 92: 99, 93: 99, 94: 99, 95: 99, 96: 99, 97: 100, 98: 100, 99: 100, 100: 100
-    },
-    "french_sl": {
-        0: 40, 1: 41, 2: 41, 3: 42, 4: 43, 5: 43, 6: 44, 7: 45, 8: 45, 9: 46, 10: 46, 11: 47, 12: 48, 13: 48, 14: 49,
-        15: 50, 16: 51, 17: 51, 18: 52, 19: 53, 20: 53, 21: 54, 22: 55, 23: 55, 24: 56, 25: 57, 26: 57, 27: 58, 28: 59, 29: 60, 30: 60, 31: 61, 32: 62, 33: 63, 34: 63, 35: 64, 36: 65, 37: 66, 38: 66, 39: 67, 40: 68, 41: 69, 42: 69, 43: 70, 44: 71, 45: 72, 46: 73, 47: 74, 48: 74, 49: 75, 50: 76, 51: 77, 52: 78, 53: 78, 54: 79, 55: 80, 56: 81, 57: 81, 58: 82, 59: 83, 60: 84, 61: 84, 62: 85, 63: 85, 64: 85, 65: 86, 66: 86, 67: 87, 68: 88, 69: 89, 70: 90, 71: 91, 72: 92, 73: 92, 74: 93, 75: 94, 76: 94, 77: 95, 78: 95, 79: 95, 80: 95, 81: 96, 82: 96, 83: 96, 84: 97, 85: 97, 86: 97, 87: 97, 88: 97, 89: 97, 90: 97, 91: 98, 92: 98, 93: 98, 94: 98, 95: 99, 96: 99, 97: 99, 98: 100, 99: 100, 100: 100
-    },
-    "french_hl": {
-        0: 40, 1: 41, 2: 41, 3: 42, 4: 42, 5: 43, 6: 44, 7: 44, 8: 45, 9: 45, 10: 46, 11: 47, 12: 47, 13: 48, 14: 48, 15: 49,
-        16: 50, 17: 51, 18: 51, 19: 52, 20: 53, 21: 53, 22: 54, 23: 55, 24: 56, 25: 56, 26: 57, 27: 58, 28: 59, 29: 59, 30: 60, 31: 61, 32: 62, 33: 62, 34: 63, 35: 63, 36: 64, 37: 64, 38: 65, 39: 65, 40: 66, 41: 67, 42: 67, 43: 68, 44: 68, 45: 69, 46: 69, 47: 70, 48: 70, 49: 71, 50: 72, 51: 73, 52: 74, 53: 75, 54: 76, 55: 77, 56: 78, 57: 78, 58: 79, 59: 80, 60: 81, 61: 82, 62: 83, 63: 84, 64: 85, 65: 85, 66: 86, 67: 87, 68: 88, 69: 89, 70: 90, 71: 91, 72: 92, 73: 93, 74: 93, 75: 94, 76: 94, 77: 95, 78: 95, 79: 95, 80: 95, 81: 96, 82: 96, 83: 96, 84: 97, 85: 97, 86: 97, 87: 97, 88: 97, 89: 97, 90: 97, 91: 98, 92: 98, 93: 98, 94: 98, 95: 99, 96: 99, 97: 99, 98: 100, 99: 100, 100: 100
-    },
-    "english_hl": {
-        0: 0, 1: 3, 2: 5, 3: 8, 4: 10, 5: 13, 6: 15, 7: 18, 8: 21, 9: 23, 10: 26, 11: 28, 12: 31, 13: 34, 14: 36, 15: 39, 16: 41, 17: 44, 18: 46, 19: 49,
-        20: 50, 21: 51, 22: 51, 23: 52, 24: 53, 25: 53, 26: 54, 27: 55, 28: 55, 29: 56, 30: 57, 31: 57, 32: 58, 33: 59, 34: 59, 35: 60, 36: 61, 37: 62, 38: 63, 39: 64, 40: 65, 41: 67, 42: 68, 43: 69, 44: 70, 45: 71, 46: 72, 47: 73, 48: 74, 49: 75, 50: 76, 51: 77, 52: 78, 53: 79, 54: 80, 55: 81, 56: 81, 57: 82, 58: 83, 59: 83, 60: 84, 61: 85, 62: 85, 63: 86, 64: 87, 65: 87, 66: 88, 67: 89, 68: 90, 69: 91, 70: 92, 71: 92, 72: 93, 73: 94, 74: 94, 75: 95, 76: 95, 77: 95, 78: 95, 79: 96, 80: 96, 81: 96, 82: 96, 83: 97, 84: 97, 85: 97, 86: 97, 87: 97, 88: 97, 89: 97, 90: 97, 91: 98, 92: 98, 93: 98, 94: 98, 95: 98, 96: 99, 97: 99, 98: 99, 99: 99, 100: 100
-    },
-    "math_sl": {
-        0: 0, 1: 3, 2: 6, 3: 9, 4: 12, 5: 15, 6: 18, 7: 21, 8: 25, 9: 28, 10: 31, 11: 34, 12: 37, 13: 40, 14: 43, 15: 46, 16: 49,
-        17: 50, 18: 51, 19: 51, 20: 52, 21: 53, 22: 53, 23: 54, 24: 54, 25: 55, 26: 56, 27: 56, 28: 57, 29: 58, 30: 58, 31: 59, 32: 59, 33: 60, 34: 61, 35: 62, 36: 62, 37: 63, 38: 64, 39: 65, 40: 66, 41: 66, 42: 67, 43: 68, 44: 69, 45: 69, 46: 70, 47: 71, 48: 72, 49: 73, 50: 74, 51: 75, 52: 76, 53: 77, 54: 78, 55: 79, 56: 80, 57: 81, 58: 82, 59: 83, 60: 84, 61: 85, 62: 86, 63: 87, 64: 88, 65: 88, 66: 89, 67: 90, 68: 90, 69: 91, 70: 92, 71: 93, 72: 93, 73: 94, 74: 94, 75: 95, 76: 95, 77: 96, 78: 96, 79: 96, 80: 96, 81: 97, 82: 97, 83: 97, 84: 97, 85: 97, 86: 97, 87: 97, 88: 97, 89: 98, 90: 98, 91: 98, 92: 98, 93: 98, 94: 98, 95: 99, 96: 99, 97: 99, 98: 99, 99: 99, 100: 100
-    },
-    "math_hl": {
-        0: 0, 1: 4, 2: 8, 3: 11, 4: 15, 5: 19, 6: 23, 7: 26, 8: 30, 9: 34, 10: 38, 11: 41, 12: 45, 13: 49,
-        14: 50, 15: 51, 16: 51, 17: 52, 18: 53, 19: 54, 20: 54, 21: 55, 22: 56, 23: 56, 24: 57, 25: 58, 26: 59, 27: 59, 28: 60, 29: 61, 30: 62, 31: 63, 32: 64, 33: 65, 34: 66, 35: 66, 36: 67, 37: 68, 38: 69, 39: 70, 40: 71, 41: 72, 42: 73, 43: 74, 44: 75, 45: 76, 46: 77, 47: 78, 48: 79, 49: 80, 50: 81, 51: 82, 52: 83, 53: 84, 54: 85, 55: 85, 56: 86, 57: 87, 58: 88, 59: 88, 60: 89, 61: 90, 62: 91, 63: 91, 64: 92, 65: 93, 66: 93, 67: 94, 68: 94, 69: 95, 70: 95, 71: 96, 72: 96, 73: 96, 74: 96, 75: 97, 76: 97, 77: 97, 78: 97, 79: 97, 80: 97, 81: 97, 82: 97, 83: 97, 84: 97, 85: 98, 86: 98, 87: 98, 88: 98, 89: 98, 90: 98, 91: 98, 92: 98, 93: 99, 94: 99, 95: 99, 96: 99, 97: 99, 98: 99, 99: 99, 100: 100
-    },
-    "economics_hl": {
-        0: 0, 1: 4, 2: 7, 3: 11, 4: 14, 5: 18, 6: 21, 7: 25, 8: 28, 9: 32, 10: 35, 11: 39, 12: 42, 13: 46, 14: 49,
-        15: 50, 16: 50, 17: 51, 18: 51, 19: 52, 20: 53, 21: 54, 22: 55, 23: 56, 24: 57, 25: 58, 26: 59, 27: 60, 28: 61, 29: 62, 30: 63, 31: 64, 32: 65, 33: 66, 34: 67, 35: 68, 36: 69, 37: 70, 38: 71, 39: 72, 40: 73, 41: 74, 42: 72, 43: 73, 44: 74, 45: 75, 46: 76, 47: 77, 48: 78, 49: 79, 50: 84, 51: 84, 52: 85, 53: 85, 54: 86, 55: 86, 56: 87, 57: 87, 58: 88, 59: 88, 60: 89, 61: 93, 62: 93, 63: 93, 64: 93, 65: 94, 66: 94, 67: 94, 68: 95, 69: 95, 70: 95, 71: 96, 72: 96, 73: 96, 74: 97, 75: 97, 76: 97, 77: 97, 78: 97, 79: 97, 80: 97, 81: 97, 82: 97, 83: 97, 84: 98, 85: 98, 86: 98, 87: 98, 88: 98, 89: 98, 90: 99, 91: 99, 92: 99, 93: 99, 94: 99, 95: 99, 96: 100, 97: 100, 98: 100, 99: 100, 100: 100
-    },
-    "physics_hl": {
-        0: 0, 1: 4, 2: 7, 3: 11, 4: 14, 5: 18, 6: 21, 7: 25, 8: 28, 9: 32, 10: 35, 11: 39, 12: 42, 13: 46, 14: 49,
-        15: 50, 16: 51, 17: 52, 18: 53, 19: 54, 20: 55, 21: 56, 22: 57, 23: 58, 24: 59, 25: 60, 26: 61, 27: 62, 28: 63, 29: 64, 30: 65, 31: 66, 32: 67, 33: 68, 34: 69, 35: 70, 36: 71, 37: 72, 38: 73, 39: 74, 40: 75, 41: 76, 42: 77, 43: 78, 44: 78, 45: 79, 46: 80, 47: 81, 48: 82, 49: 83, 50: 84, 51: 85, 52: 86, 53: 87, 54: 88, 55: 88, 56: 89, 57: 90, 58: 91, 59: 92, 60: 93, 61: 93, 62: 94, 63: 94, 64: 94, 65: 95, 66: 95, 67: 95, 68: 96, 69: 96, 70: 97, 71: 97, 72: 97, 73: 97, 74: 97, 75: 97, 76: 97, 77: 97, 78: 97, 79: 97, 80: 98, 81: 98, 82: 98, 83: 98, 84: 98, 85: 98, 86: 98, 87: 98, 88: 98, 89: 98, 90: 99, 91: 99, 92: 99, 93: 99, 94: 99, 95: 99, 96: 99, 97: 99, 98: 99, 99: 99, 100: 100
-    },
-    "english_sl": {
-        0: 0, 1: 3, 2: 5, 3: 8, 4: 10, 5: 13, 6: 15, 7: 18, 8: 21, 9: 23, 10: 26, 11: 28, 12: 31, 13: 34, 14: 36, 15: 39, 16: 41, 17: 44, 18: 46, 19: 49,
-        20: 50, 21: 51, 22: 51, 23: 52, 24: 53, 25: 53, 26: 54, 27: 55, 28: 55, 29: 56, 30: 57, 31: 57, 32: 58, 33: 59, 34: 59, 35: 60, 36: 61, 37: 62, 38: 63, 39: 64, 40: 65, 41: 67, 42: 68, 43: 69, 44: 70, 45: 71, 46: 72, 47: 73, 48: 74, 49: 75, 50: 76, 51: 77, 52: 78, 53: 79, 54: 80, 55: 81, 56: 81, 57: 82, 58: 83, 59: 83, 60: 84, 61: 85, 62: 85, 63: 86, 64: 87, 65: 87, 66: 88, 67: 89, 68: 90, 69: 91, 70: 92, 71: 92, 72: 93, 73: 94, 74: 94, 75: 95, 76: 95, 77: 95, 78: 95, 79: 96, 80: 96, 81: 96, 82: 96, 83: 97, 84: 97, 85: 97, 86: 97, 87: 97, 88: 97, 89: 97, 90: 97, 91: 98, 92: 98, 93: 98, 94: 98, 95: 98, 96: 99, 97: 99, 98: 99, 99: 99, 100: 100
-    },
-    "geography_sl": {
-        0: 0, 1: 4, 2: 8, 3: 12, 4: 16, 5: 20, 6: 25, 7: 29, 8: 33, 9: 37, 10: 41, 11: 45, 12: 49,
-        13: 50, 14: 51, 15: 51, 16: 52, 17: 53, 18: 53, 19: 54, 20: 55, 21: 55, 22: 56, 23: 57, 24: 57, 25: 58, 26: 59, 27: 59, 28: 60, 29: 61, 30: 62, 31: 63, 32: 63, 33: 64, 34: 65, 35: 66, 36: 66, 37: 67, 38: 68, 39: 69, 40: 69, 41: 70, 42: 71, 43: 72, 44: 73, 45: 74, 46: 76, 47: 77, 48: 78, 49: 79, 50: 81, 51: 82, 52: 83, 53: 84, 54: 85, 55: 86, 56: 86, 57: 87, 58: 88, 59: 89, 60: 90, 61: 90, 62: 91, 63: 92, 64: 93, 65: 93, 66: 94, 67: 94, 68: 94, 69: 95, 70: 95, 71: 95, 72: 95, 73: 96, 74: 96, 75: 97, 76: 97, 77: 97, 78: 97, 79: 97, 80: 97, 81: 97, 82: 97, 83: 98, 84: 98, 85: 98, 86: 98, 87: 98, 88: 98, 89: 98, 90: 99, 91: 99, 92: 99, 93: 99, 94: 99, 95: 99, 96: 99, 97: 100, 98: 100, 99: 100, 100: 100
-    },
-    "history_hl": {
-        0: 0, 1: 4, 2: 8, 3: 12, 4: 16, 5: 20, 6: 25, 7: 29, 8: 33, 9: 37, 10: 41, 11: 45, 12: 49,
-        13: 50, 14: 51, 15: 51, 16: 52, 17: 53, 18: 53, 19: 54, 20: 55, 21: 55, 22: 56, 23: 57, 24: 57, 25: 58, 26: 59, 27: 59, 28: 60, 29: 61, 30: 62, 31: 63, 32: 63, 33: 64, 34: 65, 35: 66, 36: 66, 37: 67, 38: 68, 39: 69, 40: 69, 41: 70, 42: 71, 43: 72, 44: 73, 45: 74, 46: 76, 47: 77, 48: 78, 49: 79, 50: 81, 51: 82, 52: 83, 53: 84, 54: 85, 55: 86, 56: 86, 57: 87, 58: 88, 59: 89, 60: 90, 61: 90, 62: 91, 63: 92, 64: 93, 65: 93, 66: 94, 67: 94, 68: 94, 69: 95, 70: 95, 71: 95, 72: 95, 73: 96, 74: 96, 75: 97, 76: 97, 77: 97, 78: 97, 79: 97, 80: 97, 81: 97, 82: 97, 83: 98, 84: 98, 85: 98, 86: 98, 87: 98, 88: 98, 89: 98, 90: 99, 91: 99, 92: 99, 93: 99, 94: 99, 95: 99, 96: 99, 97: 100, 98: 100, 99: 100, 100: 100
-    },
-    "history_sl": {
-        0: 0, 1: 4, 2: 8, 3: 12, 4: 16, 5: 20, 6: 25, 7: 29, 8: 33, 9: 37, 10: 41, 11: 45, 12: 49,
-        13: 50, 14: 51, 15: 51, 16: 52, 17: 53, 18: 53, 19: 54, 20: 55, 21: 55, 22: 56, 23: 57, 24: 57, 25: 58, 26: 59, 27: 59, 28: 60, 29: 61, 30: 62, 31: 63, 32: 63, 33: 64, 34: 65, 35: 66, 36: 66, 37: 67, 38: 68, 39: 69, 40: 69, 41: 70, 42: 71, 43: 72, 44: 73, 45: 74, 46: 76, 47: 77, 48: 78, 49: 79, 50: 81, 51: 82, 52: 83, 53: 84, 54: 85, 55: 86, 56: 86, 57: 87, 58: 88, 59: 89, 60: 90, 61: 90, 62: 91, 63: 92, 64: 93, 65: 93, 66: 94, 67: 94, 68: 94, 69: 95, 70: 95, 71: 95, 72: 95, 73: 96, 74: 96, 75: 97, 76: 97, 77: 97, 78: 97, 79: 97, 80: 97, 81: 97, 82: 97, 83: 98, 84: 98, 85: 98, 86: 98, 87: 98, 88: 98, 89: 98, 90: 99, 91: 99, 92: 99, 93: 99, 94: 99, 95: 99, 96: 99, 97: 100, 98: 100, 99: 100, 100: 100
-    },
-    "economics_sl": {
-        0: 0, 1: 4, 2: 7, 3: 11, 4: 14, 5: 18, 6: 21, 7: 25, 8: 28, 9: 32, 10: 35, 11: 39, 12: 42, 13: 46, 14: 49,
-        15: 50, 16: 50, 17: 51, 18: 51, 19: 52, 20: 53, 21: 54, 22: 55, 23: 56, 24: 57, 25: 58, 26: 59, 27: 60, 28: 61, 29: 62, 30: 63, 31: 64, 32: 65, 33: 66, 34: 67, 35: 68, 36: 69, 37: 70, 38: 71, 39: 72, 40: 73, 41: 74, 42: 72, 43: 73, 44: 74, 45: 75, 46: 76, 47: 77, 48: 78, 49: 79, 50: 84, 51: 84, 52: 85, 53: 85, 54: 86, 55: 86, 56: 87, 57: 87, 58: 88, 59: 88, 60: 89, 61: 93, 62: 93, 63: 93, 64: 93, 65: 94, 66: 94, 67: 94, 68: 95, 69: 95, 70: 95, 71: 96, 72: 96, 73: 96, 74: 97, 75: 97, 76: 97, 77: 97, 78: 97, 79: 97, 80: 97, 81: 97, 82: 97, 83: 97, 84: 98, 85: 98, 86: 98, 87: 98, 88: 98, 89: 98, 90: 99, 91: 99, 92: 99, 93: 99, 94: 99, 95: 99, 96: 100, 97: 100, 98: 100, 99: 100, 100: 100
-    },
-    "spanish_sl": {
-        0: 40, 1: 40, 2: 41, 3: 41, 4: 42, 5: 42, 6: 43, 7: 44, 8: 45, 9: 46, 10: 47, 11: 48, 12: 49,
-        13: 50, 14: 50, 15: 51, 16: 51, 17: 52, 18: 52, 19: 53, 20: 53, 21: 54, 22: 55, 23: 56, 24: 57, 25: 58, 26: 59, 27: 60, 28: 61, 29: 61, 30: 62, 31: 62, 32: 63, 33: 63, 34: 64, 35: 65, 36: 66, 37: 67, 38: 68, 39: 69, 40: 70, 41: 71, 42: 72, 43: 72, 44: 73, 45: 73, 46: 74, 47: 74, 48: 75, 49: 76, 50: 77, 51: 78, 52: 79, 53: 80, 54: 81, 55: 82, 56: 83, 57: 84, 58: 84, 59: 85, 60: 85, 61: 86, 62: 86, 63: 87, 64: 87, 65: 88, 66: 88, 67: 89, 68: 90, 69: 91, 70: 92, 71: 93, 72: 93, 73: 94, 74: 94, 75: 95, 76: 95, 77: 95, 78: 95, 79: 95, 80: 95, 81: 95, 82: 96, 83: 96, 84: 96, 85: 97, 86: 97, 87: 97, 88: 97, 89: 98, 90: 98, 91: 98, 92: 98, 93: 99, 94: 99, 95: 99, 96: 99, 97: 100, 98: 100, 99: 100, 100: 100
-    },
-    "business_sl": {
-        1: 1, 2: 3, 3: 6, 4: 9, 5: 13, 6: 16, 7: 19, 8: 22, 9: 25, 10: 28, 11: 31, 12: 34, 13: 37, 14: 40, 15: 43, 16: 46, 17: 49,
-        18: 50, 19: 50, 20: 51, 21: 51, 22: 52, 23: 52, 24: 53, 25: 53, 26: 54, 27: 54, 28: 55, 29: 55, 30: 56, 31: 57, 32: 58, 33: 59, 34: 60, 35: 61, 36: 62, 37: 63, 38: 64, 39: 65, 40: 66, 41: 67, 42: 68, 43: 69, 44: 70, 45: 71, 46: 72, 47: 72, 48: 74, 49: 75, 50: 77, 51: 78, 52: 79, 53: 80, 54: 81, 55: 82, 56: 83, 57: 84, 58: 84, 59: 85, 60: 85, 61: 86, 62: 87, 63: 88, 64: 89, 65: 90, 66: 91, 67: 92, 68: 93, 69: 93, 70: 94, 71: 94, 72: 94, 73: 94, 74: 95, 75: 95, 76: 96, 77: 96, 78: 97, 79: 97, 80: 97, 81: 97, 82: 97, 83: 97, 84: 97, 85: 97, 86: 98, 87: 98, 88: 98, 89: 98, 90: 98, 91: 98, 92: 98, 93: 99, 94: 99, 95: 99, 96: 99, 97: 100, 98: 100, 99: 100, 100: 100
-    }
+# Map subject command names to JSON filenames
+SUBJECT_JSON_MAP = {
+    "english_hl": "eng.json",
+    "french_sl": "fsf.json",
+    "french_hl": "fif.json",
+    "spanish_sl": "esp.json",
+    "economics_hl": "econ.json",
+    "geography_hl": "geo.json",
+    "business_sl": "bbb.json",
+    "chemistry_sl": "scha.json",
+    "chemistry_hl": "schb.json",
+    "biology_sl": "sbia.json",
+    "biology_hl": "sbib.json",
+    "physics_sl": "sph.json",
+    "math_sl": "mtha.json",
+    "math_hl": "mthb.json"
 }
+
+SUBJECT_CONVERSIONS = {}
+for subject, filename in SUBJECT_JSON_MAP.items():
+    try:
+        with open(os.path.join(DATA_DIR, filename), 'r') as f:
+            SUBJECT_CONVERSIONS[subject] = json.load(f)
+    except Exception as e:
+        print(f"Warning: Could not load {filename} for {subject}: {e}")
+
+# --- Conversion functions using new structure ---
+def raw_to_converted(raw_mark, subject="physics_sl"):
+    """Convert raw IB mark to converted Ontario mark using loaded JSON tables"""
+    if subject not in SUBJECT_CONVERSIONS:
+        subject = "physics_sl"
+    data = SUBJECT_CONVERSIONS[subject]
+    # Flatten all levels into one dict
+    flat = {int(k): v for level in data.values() for k, v in level.items()}
+    raw_mark = int(raw_mark)
+    if str(raw_mark) in [k for level in data.values() for k in level.keys()]:
+        # Find the value directly
+        for level in data.values():
+            if str(raw_mark) in level:
+                return level[str(raw_mark)]
+    # Interpolate if not found
+    keys = sorted(flat.keys())
+    if raw_mark <= keys[0]:
+        return flat[keys[0]]
+    if raw_mark >= keys[-1]:
+        return flat[keys[-1]]
+    for i in range(len(keys)-1):
+        if keys[i] <= raw_mark <= keys[i+1]:
+            x1, x2 = keys[i], keys[i+1]
+            y1, y2 = flat[x1], flat[x2]
+            return round(y1 + (y2-y1)*(raw_mark-x1)/(x2-x1))
+    return flat[keys[0]]
+
+def raw_to_ib_level(raw_mark, subject="physics_sl"):
+    """Convert raw IB mark to IB level (1-7) using loaded JSON tables"""
+    if subject not in SUBJECT_CONVERSIONS:
+        subject = "physics_sl"
+    data = SUBJECT_CONVERSIONS[subject]
+    for level in range(7, 0, -1):
+        level_key = f"Level {level}"
+        if level_key in data and str(raw_mark) in data[level_key]:
+            return level
+    # If not found, try to infer by converted mark
+    converted = raw_to_converted(raw_mark, subject)
+    return percentage_to_ib_level(converted, subject)
+
+def percentage_to_ib_level(percentage, subject="physics_sl"):
+    """Convert Ontario percentage to IB level using loaded JSON tables"""
+    if subject not in SUBJECT_CONVERSIONS:
+        subject = "physics_sl"
+    data = SUBJECT_CONVERSIONS[subject]
+    # Find the highest level where any value in that level is <= percentage
+    for level in range(7, 0, -1):
+        level_key = f"Level {level}"
+        if level_key in data:
+            for v in data[level_key].values():
+                if percentage >= v:
+                    return level
+    return 1
+
+def ib_level_to_percentage(ib_level, subject="physics_sl"):
+    """Convert IB level (1-7) to minimum Ontario percentage using loaded JSON tables"""
+    if subject not in SUBJECT_CONVERSIONS:
+        subject = "physics_sl"
+    data = SUBJECT_CONVERSIONS[subject]
+    level_key = f"Level {ib_level}"
+    if level_key in data:
+        # Return the minimum percentage for this level
+        return min([int(v) for v in data[level_key].values()])
+    return 0
 
 # IB Level boundaries (converted marks) - Subject-specific
 # Based on actual WOSS IB boundaries
@@ -145,77 +149,6 @@ IB_LEVEL_BOUNDARIES = {
         7: 97    # 97% = Level 7
     }
 }
-
-def raw_to_converted(raw_percentage, subject="physics_sl"):
-    """Convert raw IB mark to converted Ontario mark"""
-    if subject not in SUBJECT_CONVERSIONS:
-        subject = "physics_sl"  # Default fallback
-    
-    conversions = SUBJECT_CONVERSIONS[subject]
-    
-    # If exact match exists, return it
-    if raw_percentage in conversions:
-        return conversions[raw_percentage]
-    
-    # Find the two closest conversion points for interpolation
-    raw_points = sorted(conversions.keys())
-    
-    # Handle edge cases
-    if raw_percentage <= raw_points[0]:
-        return conversions[raw_points[0]]
-    if raw_percentage >= raw_points[-1]:
-        return conversions[raw_points[-1]]
-    
-    # Find the two points to interpolate between
-    for i in range(len(raw_points) - 1):
-        if raw_points[i] <= raw_percentage <= raw_points[i + 1]:
-            x1, x2 = raw_points[i], raw_points[i + 1]
-            y1, y2 = conversions[x1], conversions[x2]
-            
-            # Linear interpolation
-            converted = y1 + (y2 - y1) * (raw_percentage - x1) / (x2 - x1)
-            return round(converted)
-    
-    # Fallback
-    return conversions[raw_points[0]]
-
-def ib_level_to_percentage(ib_level, subject="physics_sl"):
-    """Convert IB level (1-7) to Ontario percentage using subject-specific conversions"""
-    if subject not in SUBJECT_CONVERSIONS:
-        subject = "physics_sl"  # Default fallback
-    
-    # The CSV shows IB levels mapping to Ontario percentages
-    # We need to find the minimum percentage for each IB level
-    conversions = SUBJECT_CONVERSIONS[subject]
-    
-    # For each IB level, find the minimum raw mark that gives that level
-    # This is a simplified approach - in reality, we'd need the actual IB level boundaries
-    # For now, we'll use the boundaries from IB_LEVEL_BOUNDARIES
-    if subject in IB_LEVEL_BOUNDARIES:
-        boundaries = IB_LEVEL_BOUNDARIES[subject]
-    else:
-        boundaries = IB_LEVEL_BOUNDARIES["default"]
-    
-    return boundaries[ib_level]
-
-def percentage_to_ib_level(percentage, subject="physics_sl"):
-    """Convert Ontario percentage to IB level using subject-specific boundaries"""
-    # Get the appropriate boundaries for the subject
-    if subject in IB_LEVEL_BOUNDARIES:
-        boundaries = IB_LEVEL_BOUNDARIES[subject]
-    else:
-        boundaries = IB_LEVEL_BOUNDARIES["default"]
-    
-    # Find the appropriate level
-    for level in range(7, 0, -1):
-        if percentage >= boundaries[level]:
-            return level
-    return 1
-
-def raw_to_ib_level(raw_percentage, subject="physics_sl"):
-    """Convert raw IB mark directly to IB level"""
-    converted = raw_to_converted(raw_percentage, subject)
-    return percentage_to_ib_level(converted, subject)
 
 @bot.event
 async def on_ready():
@@ -321,19 +254,22 @@ async def focus_start(interaction: discord.Interaction, duration: int, mode: str
         return
     
     # Create or get focus role
-    focus_role_name = f"🎯 Focus Mode ({mode.title()})"
+    focus_role_name = f"🔒 Locked In ({mode.title()})"
     focus_role = discord.utils.get(guild.roles, name=focus_role_name)
-    
+    # If the role does not exist, do not create it (commented out)
+    # if not focus_role:
+    #     try:
+    #         focus_role = await guild.create_role(
+    #             name=focus_role_name,
+    #             color=discord.Color.red(),
+    #             reason="Focus mode role creation"
+    #         )
+    #     except discord.Forbidden:
+    #         await interaction.response.send_message("❌ I don't have permission to create roles.", ephemeral=True)
+    #         return
     if not focus_role:
-        try:
-            focus_role = await guild.create_role(
-                name=focus_role_name,
-                color=discord.Color.red(),
-                reason="Focus mode role creation"
-            )
-        except discord.Forbidden:
-            await interaction.response.send_message("❌ I don't have permission to create roles.", ephemeral=True)
-            return
+        await interaction.response.send_message("❌ The 'Locked In' role does not exist. Please ask an admin to create it.", ephemeral=True)
+        return
     
     # Add role to user
     try:
@@ -353,7 +289,7 @@ async def focus_start(interaction: discord.Interaction, duration: int, mode: str
     }
     
     embed = discord.Embed(
-        title="🎯 Focus Mode Activated!",
+        title="🔒 Locked In Activated!",
         description=f"**Mode:** {mode.title()}\n**Duration:** {duration} minutes\n**Ends at:** <t:{int(end_time.timestamp())}:t>",
         color=discord.Color.red()
     )
@@ -362,48 +298,87 @@ async def focus_start(interaction: discord.Interaction, duration: int, mode: str
         value="• Casual chat channels\n• Meme channels\n• Gaming channels\n• Off-topic discussions",
         inline=False
     )
-    embed.set_footer(text="Stay focused! You got this! 📚")
+    embed.set_footer(text="Stay locked in! You got this! 📚")
     
     await interaction.response.send_message(embed=embed)
 
-@bot.tree.command(name="unfocus", description="End your current focus session")
+@bot.tree.command(name="unfocus", description="Request to end your current focus session (admin approval required)")
 async def unfocus(interaction: discord.Interaction):
-    """End the current focus session"""
+    """Request to end the current focus session (admin approval required)"""
     user_id = interaction.user.id
-    
+    guild = interaction.guild
+    admin_role = discord.utils.get(guild.roles, name="Admins")
     if user_id not in focus_sessions:
-        await interaction.response.send_message("❌ You're not currently in a focus session.", ephemeral=True)
+        await interaction.response.send_message("❌ You're not currently in a focus session.", ephemeral=False)
         return
-    
+
     session_data = focus_sessions[user_id]
-    
-    # Remove focus session role
-    try:
-        await interaction.user.remove_roles(session_data['role'], reason="Focus session ended manually")
-    except discord.Forbidden:
-        pass
-    
-    # Calculate session duration
-    started_time = session_data['end_time'] - timedelta(minutes=session_data['duration'])
-    actual_duration = datetime.now() - started_time
-    actual_minutes = int(actual_duration.total_seconds() / 60)
-    
-    # Remove from active sessions
-    del focus_sessions[user_id]
-    
+    user = interaction.user
+
+    class ConfirmUnfocusView(discord.ui.View):
+        def __init__(self, target_user, timeout=120):
+            super().__init__(timeout=timeout)
+            self.target_user = target_user
+
+        async def interaction_check(self, button_interaction: discord.Interaction) -> bool:
+            # Only allow admins to press the buttons
+            admin_role = discord.utils.get(button_interaction.guild.roles, name="Admins")
+            if admin_role and admin_role in button_interaction.user.roles:
+                return True
+            await button_interaction.response.send_message("❌ Only admins can approve or refuse this request.", ephemeral=True)
+            return False
+
+        @discord.ui.button(label="Confirm", style=discord.ButtonStyle.green)
+        async def confirm(self, button_interaction: discord.Interaction, button: discord.ui.Button):
+            session_data = focus_sessions.get(self.target_user.id)
+            if session_data:
+                try:
+                    await self.target_user.remove_roles(session_data['role'], reason="Focus session ended by admin approval")
+                except discord.Forbidden:
+                    pass
+                started_time = session_data['end_time'] - timedelta(minutes=session_data['duration'])
+                actual_duration = datetime.now() - started_time
+                actual_minutes = int(actual_duration.total_seconds() / 60)
+                del focus_sessions[self.target_user.id]
+                embed = discord.Embed(
+                    title="✅ Focus Session Ended (Admin Confirmed)",
+                    description=f"{self.target_user.mention}'s focus session has been ended by {button_interaction.user.mention} (admin).\nGreat work! You focused for **{actual_minutes} minutes**.",
+                    color=discord.Color.green()
+                )
+                embed.add_field(
+                    name="Session Stats:",
+                    value=f"**Planned:** {session_data['duration']} minutes\n**Actual:** {actual_minutes} minutes\n**Mode:** {session_data['mode'].title()}",
+                    inline=False
+                )
+                embed.set_footer(text="Keep up the great work! 🌟")
+                await button_interaction.response.edit_message(embed=embed, view=None)
+            else:
+                await button_interaction.response.edit_message(content="❌ No active focus session found.", view=None)
+            self.stop()
+
+        @discord.ui.button(label="Refuse", style=discord.ButtonStyle.red)
+        async def refuse(self, button_interaction: discord.Interaction, button: discord.ui.Button):
+            embed = discord.Embed(
+                title="❌ Unfocus Request Refused",
+                description=f"{self.target_user.mention}'s request to end their focus session was refused by {button_interaction.user.mention} (admin).",
+                color=discord.Color.red()
+            )
+            await button_interaction.response.edit_message(embed=embed, view=None)
+            self.stop()
+
     embed = discord.Embed(
-        title="✅ Focus Session Completed!",
-        description=f"Great work! You focused for **{actual_minutes} minutes**",
-        color=discord.Color.green()
+        title="⚠️ Unfocus Request Pending",
+        description=f"{user.mention} has requested to end their focus session.\n\n**An admin must approve or refuse this request below.**",
+        color=discord.Color.orange()
     )
     embed.add_field(
-        name="Session Stats:",
-        value=f"**Planned:** {session_data['duration']} minutes\n**Actual:** {actual_minutes} minutes\n**Mode:** {session_data['mode'].title()}",
+        name="Session Info:",
+        value=f"**Mode:** {session_data['mode'].title()}\n**Planned Duration:** {session_data['duration']} minutes\n**Ends at:** <t:{int(session_data['end_time'].timestamp())}:t>",
         inline=False
     )
-    embed.set_footer(text="Keep up the great work! 🌟")
-    
-    await interaction.response.send_message(embed=embed)
+    embed.set_footer(text="Only admins can approve or refuse this request.")
+    view = ConfirmUnfocusView(user)
+    await interaction.response.send_message(embed=embed, view=view, ephemeral=False)
 
 @bot.tree.command(name="focus_status", description="Check your current focus session status")
 async def focus_status(interaction: discord.Interaction):
@@ -432,20 +407,20 @@ async def focus_status(interaction: discord.Interaction):
     
     await interaction.response.send_message(embed=embed, ephemeral=True)
 
-@bot.tree.command(name="focus_list", description="Show all users currently in focus mode")
+@bot.tree.command(name="focus_list", description="Show all users currently Locked In")
 async def focus_list(interaction: discord.Interaction):
-    """Show all users currently in focus mode"""
+    """Show all users currently Locked In"""
     if not focus_sessions:
         embed = discord.Embed(
-            title="🎯 Focus Mode Status",
-            description="No users are currently in focus mode.",
+            title="🔒 Locked In Status",
+            description="No users are currently Locked In.",
             color=discord.Color.blue()
         )
         await interaction.response.send_message(embed=embed)
         return
     
     embed = discord.Embed(
-        title="🎯 Users in Focus Mode",
+        title="🔒 Users Locked In",
         color=discord.Color.orange()
     )
     
@@ -496,26 +471,20 @@ async def focus_list(interaction: discord.Interaction):
     subject="Choose the subject"
 )
 @app_commands.choices(subject=[
-    app_commands.Choice(name="Physics SL", value="physics_sl"),
-    app_commands.Choice(name="Physics HL", value="physics_hl"),
-    app_commands.Choice(name="Chemistry SL", value="chemistry_sl"),
-    app_commands.Choice(name="Chemistry HL", value="chemistry_hl"),
-    app_commands.Choice(name="Biology SL", value="biology_sl"),
-    app_commands.Choice(name="Biology HL", value="biology_hl"),
-    app_commands.Choice(name="Math SL", value="math_sl"),
-    app_commands.Choice(name="Math HL", value="math_hl"),
-    app_commands.Choice(name="English SL", value="english_sl"),
-    app_commands.Choice(name="English HL", value="english_hl"),
-    app_commands.Choice(name="French SL", value="french_sl"),
-    app_commands.Choice(name="French HL", value="french_hl"),
-    app_commands.Choice(name="Spanish SL", value="spanish_sl"),
-    app_commands.Choice(name="Geography SL", value="geography_sl"),
-    app_commands.Choice(name="Geography HL", value="geography_hl"),
-    app_commands.Choice(name="History SL", value="history_sl"),
-    app_commands.Choice(name="History HL", value="history_hl"),
-    app_commands.Choice(name="Economics SL", value="economics_sl"),
-    app_commands.Choice(name="Economics HL", value="economics_hl"),
-    app_commands.Choice(name="Business Management SL", value="business_sl"),
+    app_commands.Choice(name="HL English", value="english_hl"),
+    app_commands.Choice(name="SL French", value="french_sl"),
+    app_commands.Choice(name="HL French", value="french_hl"),
+    app_commands.Choice(name="SL Spanish", value="spanish_sl"),
+    app_commands.Choice(name="HL Economics", value="economics_hl"),
+    app_commands.Choice(name="HL Geography", value="geography_hl"),
+    app_commands.Choice(name="SL Business", value="business_sl"),
+    app_commands.Choice(name="SL Chemistry", value="chemistry_sl"),
+    app_commands.Choice(name="HL Chemistry", value="chemistry_hl"),
+    app_commands.Choice(name="SL Biology", value="biology_sl"),
+    app_commands.Choice(name="HL Biology", value="biology_hl"),
+    app_commands.Choice(name="SL Physics", value="physics_sl"),
+    app_commands.Choice(name="SL Math", value="math_sl"),
+    app_commands.Choice(name="HL Math", value="math_hl"),
 ])
 async def raw_to_converted_cmd(interaction: discord.Interaction, raw_mark: int, subject: str):
     """Convert raw IB mark to Ontario percentage"""
@@ -566,83 +535,99 @@ async def raw_to_converted_cmd(interaction: discord.Interaction, raw_mark: int, 
     app_commands.Choice(name="General (Default)", value="default"),
     app_commands.Choice(name="Math SL", value="math_sl"),
     app_commands.Choice(name="Math HL", value="math_hl"),
+    app_commands.Choice(name="Physics SL", value="physics_sl"),
+    app_commands.Choice(name="Physics HL", value="physics_hl"),
+    app_commands.Choice(name="Chemistry SL", value="chemistry_sl"),
+    app_commands.Choice(name="Chemistry HL", value="chemistry_hl"),
+    app_commands.Choice(name="Biology SL", value="biology_sl"),
+    app_commands.Choice(name="Biology HL", value="biology_hl"),
+    app_commands.Choice(name="English SL", value="english_sl"),
+    app_commands.Choice(name="English HL", value="english_hl"),
+    app_commands.Choice(name="French SL", value="french_sl"),
+    app_commands.Choice(name="French HL", value="fif.json"),
+    app_commands.Choice(name="Spanish SL", value="esp.json"),
+    app_commands.Choice(name="Geography SL", value="geo.json"),
+    app_commands.Choice(name="Geography HL", value="geo.json"),
+    app_commands.Choice(name="History SL", value="bbb.json"),
+    app_commands.Choice(name="History HL", value="bbb.json"),
+    app_commands.Choice(name="Economics SL", value="econ.json"),
+    app_commands.Choice(name="Economics HL", value="econ.json"),
 ])
 async def ib_to_percent(interaction: discord.Interaction, ib_grade: int, subject: str = "default"):
-    """Convert IB grade (1-7) to percentage"""
+    """Convert IB grade (1-7) to percentage using JSON data if available"""
     if ib_grade not in range(1, 8):
         await interaction.response.send_message("❌ IB grades must be between 1 and 7.", ephemeral=True)
         return
     
-    # Get the appropriate boundaries for the subject
+    # Use JSON data if available
+    if subject in SUBJECT_CONVERSIONS:
+        data = SUBJECT_CONVERSIONS[subject]
+        level_key = f"Level {ib_grade}"
+        if level_key in data:
+            # Get all percentages for this level and use the minimum
+            percentages = [int(v) for v in data[level_key].values()]
+            if percentages:
+                percentage = min(percentages)
+                # Find the next level's minimum for the range
+                if ib_grade < 7:
+                    next_level_key = f"Level {ib_grade+1}"
+                    if next_level_key in data:
+                        next_percentages = [int(v) for v in data[next_level_key].values()]
+                        if next_percentages:
+                            next_level_min = min(next_percentages)
+                        else:
+                            next_level_min = 100
+                    else:
+                        next_level_min = 100
+                    range_text = f"**{percentage}% - {next_level_min-1}%**"
+                else:
+                    range_text = f"**{percentage}% - 100%**"
+                subject_name = subject.replace('_', ' ').title()
+    embed = discord.Embed(
+        title="📊 IB Grade Conversion",
+        description=f"**IB Grade {ib_grade}** = **{percentage}%** (minimum)\n**Subject:** {subject_name}",
+        color=discord.Color.blue()
+    )
+    embed.add_field(
+        name="Level Range:",
+        value=range_text,
+        inline=False
+        )
+    embed.add_field(
+        name="Note:",
+        value="This shows the minimum converted percentage required for each IB level. Actual raw marks vary by subject.",
+        inline=False
+    )
+    await interaction.response.send_message(embed=embed)
+    return
+    # Fallback to default boundaries
     if subject in IB_LEVEL_BOUNDARIES:
         boundaries = IB_LEVEL_BOUNDARIES[subject]
         subject_name = subject.replace('_', ' ').title()
     else:
         boundaries = IB_LEVEL_BOUNDARIES["default"]
         subject_name = "General"
-    
-    # Use the IB level boundaries to get the minimum percentage for each level
     percentage = boundaries[ib_grade]
-    
+    if ib_grade < 7:
+        next_level_min = boundaries[ib_grade + 1]
+        range_text = f"**{percentage}% - {next_level_min - 1}%**"
+    else:
+        range_text = f"**{percentage}% - 100%**"
     embed = discord.Embed(
         title="📊 IB Grade Conversion",
         description=f"**IB Grade {ib_grade}** = **{percentage}%** (minimum)\n**Subject:** {subject_name}",
         color=discord.Color.blue()
     )
-    
-    # Show the range for this level
-    if ib_grade < 7:
-        next_level_min = boundaries[ib_grade + 1]
-        embed.add_field(
-            name="Level Range:",
-            value=f"**{percentage}% - {next_level_min - 1}%**",
-            inline=False
-        )
-    else:
-        embed.add_field(
-            name="Level Range:",
-            value=f"**{percentage}% - 100%**",
-            inline=False
-        )
-    
+    embed.add_field(
+        name="Level Range:",
+        value=range_text,
+        inline=False
+    )
     embed.add_field(
         name="Note:",
         value="This shows the minimum converted percentage required for each IB level. Actual raw marks vary by subject.",
         inline=False
     )
-    
-    await interaction.response.send_message(embed=embed)
-
-@bot.tree.command(name="percent_to_ib", description="Convert percentage to IB grade")
-@app_commands.describe(
-    percentage="Ontario percentage (0-100)",
-    subject="Choose the subject (optional)"
-)
-@app_commands.choices(subject=[
-    app_commands.Choice(name="General (Default)", value="default"),
-    app_commands.Choice(name="Math SL", value="math_sl"),
-    app_commands.Choice(name="Math HL", value="math_hl"),
-])
-async def percent_to_ib(interaction: discord.Interaction, percentage: int, subject: str = "default"):
-    """Convert percentage to IB grade"""
-    if percentage not in range(0, 101):
-        await interaction.response.send_message("❌ Percentage must be between 0 and 100.", ephemeral=True)
-        return
-    
-    ib_grade = percentage_to_ib_level(percentage, subject)
-    
-    # Get subject name
-    if subject in IB_LEVEL_BOUNDARIES:
-        subject_name = subject.replace('_', ' ').title()
-    else:
-        subject_name = "General"
-    
-    embed = discord.Embed(
-        title="📊 Percentage Conversion",
-        description=f"**{percentage}%** = **IB Grade {ib_grade}**\n**Subject:** {subject_name}",
-        color=discord.Color.blue()
-    )
-    
     await interaction.response.send_message(embed=embed)
 
 @bot.tree.command(name="subject_conversion", description="Show conversion table for a specific subject")
@@ -995,6 +980,49 @@ async def ib_boundaries(interaction: discord.Interaction, subject: str):
     
     embed.set_footer(text="Based on WOSS IB standards")
     
+    await interaction.response.send_message(embed=embed)
+
+@bot.tree.command(name="ahhhh", description="Give everyone the Locked In role for 480 minutes (admin only)")
+async def ahhhh(interaction: discord.Interaction):
+    """Give everyone the Locked In role for 480 minutes (admin only)"""
+    guild = interaction.guild
+    admin_role = discord.utils.get(guild.roles, name="Admins")
+    is_admin = admin_role in interaction.user.roles if admin_role else False
+    if not is_admin:
+        embed = discord.Embed(
+            title="❌ Permission Denied",
+            description="Only users with the 'Admins' role can use /AHHHH.",
+            color=discord.Color.red()
+        )
+        await interaction.response.send_message(embed=embed, ephemeral=True)
+        return
+    focus_role_name = f"🔒 Locked In (Deep)"
+    focus_role = discord.utils.get(guild.roles, name=focus_role_name)
+    if not focus_role:
+        await interaction.response.send_message("❌ The 'Locked In (Deep)' role does not exist. Please ask an admin to create it.", ephemeral=True)
+        return
+    count = 0
+    for member in guild.members:
+        if not member.bot:
+            try:
+                await member.add_roles(focus_role, reason="AHHHH command used by admin")
+                # Set up a focus session for 480 minutes for each user
+                end_time = datetime.now() + timedelta(minutes=480)
+                focus_sessions[member.id] = {
+                    'end_time': end_time,
+                    'role': focus_role,
+                    'mode': 'deep',
+                    'duration': 480,
+                    'user': member
+                }
+                count += 1
+            except Exception:
+                pass
+    embed = discord.Embed(
+        title="🔒 AHHHH! Everyone is now Locked In!",
+        description=f"Gave the Locked In role to {count} users for 480 minutes.",
+        color=discord.Color.red()
+    )
     await interaction.response.send_message(embed=embed)
 
 # Background Tasks
