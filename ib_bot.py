@@ -1184,8 +1184,14 @@ async def update_resources_message(guild):
             inline=False
         )
     else:
-        # Sort subjects alphabetically
-        for subject in sorted(resources.keys()):
+        # Sort subjects alphabetically, but show general first
+        subjects = sorted(resources.keys())
+        if "general" in subjects:
+            # Move general to the front
+            subjects.remove("general")
+            subjects = ["general"] + subjects
+        
+        for subject in subjects:
             subject_resources = resources[subject]
             
             # Create formatted list of resources for this subject
