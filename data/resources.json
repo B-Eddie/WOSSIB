@@ -31,6 +31,20 @@
       "added_at": "2025-07-06T21:00:00.000000"
     }
   ],
+  "english": [
+    {
+      "url": "https://www.litcharts.com/",
+      "description": "Shakespeare",
+      "added_by": "eddie",
+      "added_at": "2025-07-07T01:02:18.480728"
+    },
+    {
+      "url": "https://www.clastify.com/",
+      "description": "Essays",
+      "added_by": "anthony huang",
+      "added_at": "2025-07-06T21:00:00.000000"
+    }
+  ],
   "french": [
     {
       "url": "https://ddotb.wordpress.com/wp-content/uploads/2013/07/practice-makes-perfect-complete-french-grammar.pdf",
@@ -43,14 +57,6 @@
       "description": "French Vocab",
       "added_by": "Michael",
       "added_at": "2025-07-06T21:00:00.000000"
-    }
-  ],
-  "english": [
-    {
-      "url": "https://www.litcharts.com/",
-      "description": "Shakespeare",
-      "added_by": "eddie",
-      "added_at": "2025-07-07T01:02:18.480728"
     }
   ],
   "math": [
@@ -66,14 +72,6 @@
       "url": "https://drive.google.com/drive/folders/1zk4gSj7HQKQBATn7oFMoGsjrntP1hrgi",
       "description": "Physics",
       "added_by": "Darek",
-      "added_at": "2025-07-06T21:00:00.000000"
-    }
-  ],
-  "english": [
-    {
-      "url": "https://www.clastify.com/",
-      "description": "Essays",
-      "added_by": "anthony huang",
       "added_at": "2025-07-06T21:00:00.000000"
     }
   ]
