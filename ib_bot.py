@@ -22,6 +22,75 @@ bot = commands.Bot(command_prefix="!", intents=intents)  # Changed from None to 
 # Data storage (in production, use a proper database)
 focus_sessions = {}
 exam_dates = {}
+resources = {}  # Store resources by subject
+
+# File paths for persistent data
+DATA_DIR = os.path.join(os.path.dirname(__file__), 'data')
+RESOURCES_FILE = os.path.join(DATA_DIR, 'resources.json')
+EXAM_DATES_FILE = os.path.join(DATA_DIR, 'exam_dates.json')
+
+# Ensure data directory exists
+os.makedirs(DATA_DIR, exist_ok=True)
+
+# Load persistent data
+def load_persistent_data():
+    """Load resources and exam dates from JSON files"""
+    global resources, exam_dates
+    
+    # Load resources
+    try:
+        if os.path.exists(RESOURCES_FILE):
+            with open(RESOURCES_FILE, 'r') as f:
+                resources = json.load(f)
+                print(f"Loaded {sum(len(resources[subject]) for subject in resources)} resources")
+    except Exception as e:
+        print(f"Error loading resources: {e}")
+        resources = {}
+    
+    # Load exam dates
+    try:
+        if os.path.exists(EXAM_DATES_FILE):
+            with open(EXAM_DATES_FILE, 'r') as f:
+                exam_data = json.load(f)
+                # Convert datetime strings back to datetime objects
+                exam_dates = {}
+                for exam_name, data in exam_data.items():
+                    exam_dates[exam_name] = {
+                        'name': data['name'],
+                        'datetime': datetime.fromisoformat(data['datetime']),
+                        'set_by': data['set_by']
+                    }
+                print(f"Loaded {len(exam_dates)} exam dates")
+    except Exception as e:
+        print(f"Error loading exam dates: {e}")
+        exam_dates = {}
+
+def save_resources():
+    """Save resources to JSON file"""
+    try:
+        with open(RESOURCES_FILE, 'w') as f:
+            json.dump(resources, f, indent=2)
+    except Exception as e:
+        print(f"Error saving resources: {e}")
+
+def save_exam_dates():
+    """Save exam dates to JSON file"""
+    try:
+        # Convert datetime objects to strings for JSON serialization
+        exam_data = {}
+        for exam_name, data in exam_dates.items():
+            exam_data[exam_name] = {
+                'name': data['name'],
+                'datetime': data['datetime'].isoformat(),
+                'set_by': data['set_by']
+            }
+        with open(EXAM_DATES_FILE, 'w') as f:
+            json.dump(exam_data, f, indent=2)
+    except Exception as e:
+        print(f"Error saving exam dates: {e}")
+
+# Load data on startup
+load_persistent_data()
 
 # --- Load subject conversion tables from JSON files ---
 DATA_DIR = os.path.join(os.path.dirname(__file__), 'data')
@@ -834,6 +903,9 @@ async def set_exam(interaction: discord.Interaction, exam_name: str, date: str, 
         'set_by': interaction.user.id
     }
     
+    # Save exam dates to file
+    save_exam_dates()
+    
     embed = discord.Embed(
         title="📅 Exam Date Set!",
         description=f"**{exam_name}**\n<t:{int(exam_datetime.timestamp())}:F>",
@@ -931,6 +1003,9 @@ async def remove_exam(interaction: discord.Interaction, exam_name: str):
     
     removed_exam = exam_dates.pop(exam_key)
     
+    # Save exam dates to file
+    save_exam_dates()
+    
     embed = discord.Embed(
         title="🗑️ Exam Removed",
         description=f"**{removed_exam['name']}** has been removed from the countdown list.",
@@ -1025,6 +1100,133 @@ async def ahhhh(interaction: discord.Interaction):
     )
     await interaction.response.send_message(embed=embed)
 
+@bot.tree.command(name="add_resource", description="Add a study resource to the resources channel")
+@app_commands.describe(
+    url="URL of the resource",
+    description="Description of the resource",
+    subject="Subject category for the resource"
+)
+@app_commands.choices(subject=[
+    app_commands.Choice(name="Physics", value="physics"),
+    app_commands.Choice(name="Chemistry", value="chemistry"),
+    app_commands.Choice(name="Biology", value="biology"),
+    app_commands.Choice(name="Math", value="math"),
+    app_commands.Choice(name="English", value="english"),
+    app_commands.Choice(name="French", value="french"),
+    app_commands.Choice(name="Spanish", value="spanish"),
+    app_commands.Choice(name="Geography", value="geography"),
+    app_commands.Choice(name="History", value="history"),
+    app_commands.Choice(name="Economics", value="economics"),
+    app_commands.Choice(name="Business", value="business"),
+    app_commands.Choice(name="General", value="general"),
+])
+async def add_resource(interaction: discord.Interaction, url: str, description: str, subject: str):
+    """Add a study resource to the resources channel"""
+    # Store the resource
+    if subject not in resources:
+        resources[subject] = []
+    
+    resources[subject].append({
+        'url': url,
+        'description': description,
+        'added_by': interaction.user.display_name,
+        'added_at': datetime.now().isoformat()
+    })
+    
+    # Save resources to file
+    save_resources()
+    
+    # Update the resources message
+    await update_resources_message(interaction.guild)
+    
+    embed = discord.Embed(
+        title="✅ Resource Added!",
+        description=f"**Subject:** {subject.title()}\n**Description:** {description}\n**URL:** {url}",
+        color=discord.Color.green()
+    )
+    embed.set_footer(text=f"Added by {interaction.user.display_name}")
+    
+    await interaction.response.send_message(embed=embed, ephemeral=True)
+
+@bot.tree.command(name="refresh_resources", description="Refresh the resources message in the channel")
+async def refresh_resources(interaction: discord.Interaction):
+    """Refresh the resources message in the channel"""
+    await update_resources_message(interaction.guild)
+    
+    embed = discord.Embed(
+        title="✅ Resources Refreshed!",
+        description="The resources message has been updated in the channel.",
+        color=discord.Color.green()
+    )
+    
+    await interaction.response.send_message(embed=embed, ephemeral=True)
+
+async def update_resources_message(guild):
+    """Update the resources message in the specified channel"""
+    channel_id = 1386860031512940565
+    channel = guild.get_channel(channel_id)
+    
+    if not channel:
+        print(f"Warning: Resources channel {channel_id} not found")
+        return
+    
+    # Create the resources embed
+    embed = discord.Embed(
+        title="📚 Study Resources",
+        description="Organized by subject - click the links to access the resources!",
+        color=discord.Color.blue()
+    )
+    
+    if not resources:
+        embed.add_field(
+            name="No Resources Yet",
+            value="Be the first to add a resource using `/add_resource`!",
+            inline=False
+        )
+    else:
+        # Sort subjects alphabetically
+        for subject in sorted(resources.keys()):
+            subject_resources = resources[subject]
+            
+            # Create formatted list of resources for this subject
+            resource_list = []
+            for i, resource in enumerate(subject_resources, 1):
+                resource_list.append(f"{i}. [{resource['description']}]({resource['url']}) - Added by {resource['added_by']}")
+            
+            # Join resources with newlines, limit to avoid field length issues
+            resources_text = "\n".join(resource_list)
+            if len(resources_text) > 1024:
+                resources_text = resources_text[:1021] + "..."
+            
+            embed.add_field(
+                name=f"📖 {subject.title()}",
+                value=resources_text,
+                inline=False
+            )
+    
+    # Add instructions at the end
+    embed.add_field(
+        name="➕ How to Add Resources",
+        value="Use `/add_resource <url> <description> <subject>` to add new study resources to this list!",
+        inline=False
+    )
+    
+    embed.set_footer(text="Last updated")
+    embed.timestamp = datetime.now()
+    
+    # Try to find and update existing message, or send new one
+    try:
+        # Look for the bot's previous message in the channel
+        async for message in channel.history(limit=100):
+            if message.author == bot.user and "📚 Study Resources" in message.embeds[0].title if message.embeds else False:
+                await message.edit(embed=embed)
+                return
+        
+        # If no existing message found, send a new one
+        await channel.send(embed=embed)
+    except Exception as e:
+        print(f"Error updating resources message: {e}")
+
 # Background Tasks
 @tasks.loop(minutes=1)
 async def check_focus_sessions():
@@ -1074,6 +1276,10 @@ async def update_exam_countdowns():
     
     for exam_key in past_exams:
         del exam_dates[exam_key]
+    
+    # Save exam dates to file if any were removed
+    if past_exams:
+        save_exam_dates()
 
 if __name__ == "__main__":
     # Make sure to set your bot token in .env file

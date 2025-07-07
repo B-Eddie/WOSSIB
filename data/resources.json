@@ -1,0 +1,66 @@
+{
+  "general": [
+    {
+      "url": "https://www.ibo.org/globalassets/new-structure/programmes/dp/pdfs/may-2026-examination-schedule.pdf",
+      "description": "ib exam schedule",
+      "added_by": "eddie",
+      "added_at": "2025-07-06T20:57:19.841353"
+    },
+    {
+      "url": "https://dl.ibdocs.re/",
+      "description": "ibdocs",
+      "added_by": "eddie",
+      "added_at": "2025-07-06T20:57:54.781045"
+    },
+    {
+      "url": "https://ibconverter.live/",
+      "description": "IB Grade Converter",
+      "added_by": "anthony huang",
+      "added_at": "2025-07-06T21:00:00.000000"
+    },
+    {
+      "url": "https://www.clastify.com/",
+      "description": "Essays",
+      "added_by": "anthony huang",
+      "added_at": "2025-07-06T21:00:00.000000"
+    },
+    {
+      "url": "https://blog.anthonyhuang.net/posts/woss-ib-year1-guide/",
+      "description": "Anthony's guide",
+      "added_by": "anthony huang",
+      "added_at": "2025-07-06T21:00:00.000000"
+    },
+    {
+      "url": "https://drive.google.com/drive/folders/1RO9bMqC_NN_xv_VGxe_Sl3E6gx8O7kQF",
+      "description": "Math",
+      "added_by": "Michael",
+      "added_at": "2025-07-06T21:00:00.000000"
+    },
+    {
+      "url": "https://drive.google.com/drive/folders/1zk4gSj7HQKQBATn7oFMoGsjrntP1hrgi",
+      "description": "Physics",
+      "added_by": "Darek",
+      "added_at": "2025-07-06T21:00:00.000000"
+    },
+    {
+      "url": "https://ibresources.in/",
+      "description": "ibResources - An aggregator site for IB Resources",
+      "added_by": "Darek",
+      "added_at": "2025-07-06T21:00:00.000000"
+    }
+  ],
+  "french": [
+    {
+      "url": "https://ddotb.wordpress.com/wp-content/uploads/2013/07/practice-makes-perfect-complete-french-grammar.pdf",
+      "description": "French Grammar",
+      "added_by": "Michael",
+      "added_at": "2025-07-06T21:00:00.000000"
+    },
+    {
+      "url": "https://drtayeb.wordpress.com/wp-content/uploads/2011/12/practice-makes-perfect-french-vocabulary1.pdf",
+      "description": "French Vocab",
+      "added_by": "Michael",
+      "added_at": "2025-07-06T21:00:00.000000"
+    }
+  ]
+}
