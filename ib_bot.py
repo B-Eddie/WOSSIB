@@ -927,66 +927,139 @@ async def set_exam(interaction: discord.Interaction, exam_name: str, date: str, 
 @app_commands.describe(exam_name="Name of the exam (leave empty to show all)")
 async def exam_countdown(interaction: discord.Interaction, exam_name: str = None):
     """Show countdown to exam(s)"""
-    if not exam_dates:
-        await interaction.response.send_message("❌ No exam dates have been set yet.", ephemeral=True)
-        return
-    
-    if exam_name:
-        exam_key = exam_name.lower()
-        if exam_key not in exam_dates:
-            available_exams = ", ".join([exam['name'] for exam in exam_dates.values()])
-            await interaction.response.send_message(f"❌ Exam '{exam_name}' not found. Available exams: {available_exams}", ephemeral=True)
+    try:
+        if not exam_dates:
+            await interaction.response.send_message("❌ No exam dates have been set yet.", ephemeral=True)
             return
-        
-        exam_data = exam_dates[exam_key]
-        exam_datetime = exam_data['datetime']
-        time_until = exam_datetime - datetime.now()
-        
-        if time_until.total_seconds() <= 0:
-            embed = discord.Embed(
-                title="⏰ Exam Time!",
-                description=f"**{exam_data['name']}** is happening now or has passed!",
-                color=discord.Color.red()
-            )
-        else:
-            days = time_until.days
-            hours = int((time_until.total_seconds() % 86400) / 3600)
-            minutes = int((time_until.total_seconds() % 3600) / 60)
-            
-            embed = discord.Embed(
-                title="⏳ Exam Countdown",
-                description=f"**{exam_data['name']}**\n<t:{int(exam_datetime.timestamp())}:F>",
-                color=discord.Color.orange()
-            )
-            embed.add_field(
-                name="Time Remaining:",
-                value=f"**{days}** days, **{hours}** hours, **{minutes}** minutes",
-                inline=False
-            )
-    else:
-        # Show all exams
-        embed = discord.Embed(
-            title="📅 All Exam Countdowns",
-            color=discord.Color.orange()
-        )
-        
-        for exam_data in sorted(exam_dates.values(), key=lambda x: x['datetime']):
+        if exam_name:
+            exam_key = exam_name.lower()
+            if exam_key not in exam_dates:
+                available_exams = ", ".join([exam['name'] for exam in exam_dates.values()])
+                await interaction.response.send_message(f"❌ Exam '{exam_name}' not found. Available exams: {available_exams}", ephemeral=True)
+                return
+            exam_data = exam_dates[exam_key]
             exam_datetime = exam_data['datetime']
+            if isinstance(exam_datetime, str):
+                try:
+                    exam_datetime = datetime.fromisoformat(exam_datetime)
+                    exam_data['datetime'] = exam_datetime
+                except Exception as e:
+                    print(f"Warning: Could not parse datetime for exam '{exam_data['name']}': {e}")
+                    await interaction.response.send_message(f"❌ Could not parse date for exam '{exam_data['name']}'.", ephemeral=True)
+                    return
             time_until = exam_datetime - datetime.now()
-            
             if time_until.total_seconds() <= 0:
-                time_text = "**EXAM TIME!**"
+                embed = discord.Embed(
+                    title="⏰ Exam Time!",
+                    description=f"**{exam_data['name']}** is happening now or has passed!",
+                    color=discord.Color.red()
+                )
             else:
                 days = time_until.days
-                time_text = f"{days} days remaining"
-            
-            embed.add_field(
-                name=exam_data['name'],
-                value=f"<t:{int(exam_datetime.timestamp())}:d>\n{time_text}",
-                inline=True
+                hours = int((time_until.total_seconds() % 86400) / 3600)
+                minutes = int((time_until.total_seconds() % 3600) / 60)
+                embed = discord.Embed(
+                    title="⏳ Exam Countdown",
+                    description=f"**{exam_data['name']}**\n<t:{int(exam_datetime.timestamp())}:F>",
+                    color=discord.Color.orange()
+                )
+                embed.add_field(
+                    name="Time Remaining:",
+                    value=f"**{days}** days, **{hours}** hours, **{minutes}** minutes",
+                    inline=False
+                )
+            await interaction.response.send_message(embed=embed)
+            return
+        # --- Pagination for all exams ---
+        exams_sorted = sorted(exam_dates.values(), key=lambda x: x.get('datetime', datetime.max))
+        exams_per_page = 25
+        total_pages = (len(exams_sorted) + exams_per_page - 1) // exams_per_page
+        def make_embed(page_idx: int):
+            embed = discord.Embed(
+                title="📅 All Exam Countdowns",
+                color=discord.Color.orange()
             )
-    
-    await interaction.response.send_message(embed=embed)
+            start = page_idx * exams_per_page
+            end = start + exams_per_page
+            page_exams = exams_sorted[start:end]
+            for exam_data in page_exams:
+                if 'name' not in exam_data or 'datetime' not in exam_data:
+                    print(f"Warning: Malformed exam entry: {exam_data}")
+                    continue
+                exam_name = exam_data['name']
+                exam_datetime = exam_data['datetime']
+                if isinstance(exam_datetime, str):
+                    try:
+                        exam_datetime = datetime.fromisoformat(exam_datetime)
+                        exam_data['datetime'] = exam_datetime
+                    except Exception as e:
+                        print(f"Warning: Could not parse datetime for exam '{exam_name}': {e}")
+                        continue
+                time_until = exam_datetime - datetime.now()
+                if time_until.total_seconds() <= 0:
+                    time_text = "**EXAM TIME!**"
+                else:
+                    days = time_until.days
+                    time_text = f"{days} days remaining"
+                try:
+                    embed.add_field(
+                        name=exam_name,
+                        value=f"<t:{int(exam_datetime.timestamp())}:d>\n{time_text}",
+                        inline=True
+                    )
+                except Exception as e:
+                    print(f"Warning: Could not add field for exam '{exam_name}': {e}")
+                    continue
+            embed.set_footer(text=f"Page {page_idx+1} of {total_pages}")
+            return embed
+        class ExamPaginationView(discord.ui.View):
+            def __init__(self, author_id, timeout=120):
+                super().__init__(timeout=timeout)
+                self.page = 0
+                self.author_id = author_id
+                self.message = None
+                self.update_buttons()
+            def update_buttons(self):
+                self.clear_items()
+                if total_pages > 1:
+                    self.add_item(self.PrevButton(self))
+                    self.add_item(self.NextButton(self))
+            async def interaction_check(self, interaction: discord.Interaction) -> bool:
+                if interaction.user.id != self.author_id:
+                    await interaction.response.send_message("❌ Only the command user can use these buttons.", ephemeral=True)
+                    return False
+                return True
+            class PrevButton(discord.ui.Button):
+                def __init__(self, parent):
+                    super().__init__(style=discord.ButtonStyle.primary, emoji="⬅️")
+                    self.parent = parent
+                async def callback(self, interaction: discord.Interaction):
+                    if self.parent.page > 0:
+                        self.parent.page -= 1
+                        await interaction.response.edit_message(embed=make_embed(self.parent.page), view=self.parent)
+            class NextButton(discord.ui.Button):
+                def __init__(self, parent):
+                    super().__init__(style=discord.ButtonStyle.primary, emoji="➡️")
+                    self.parent = parent
+                async def callback(self, interaction: discord.Interaction):
+                    if self.parent.page < total_pages - 1:
+                        self.parent.page += 1
+                        await interaction.response.edit_message(embed=make_embed(self.parent.page), view=self.parent)
+        view = ExamPaginationView(interaction.user.id)
+        await interaction.response.send_message(embed=make_embed(0), view=view)
+    except Exception as e:
+        import traceback
+        print(f"Exception in /exam_countdown: {e}\n{traceback.format_exc()}")
+        try:
+            if interaction.response.is_done():
+                await interaction.followup.send("❌ An unexpected error occurred while processing the exam countdown.", ephemeral=True)
+            else:
+                await interaction.response.send_message("❌ An unexpected error occurred while processing the exam countdown.", ephemeral=True)
+        except Exception:
+            try:
+                await interaction.user.send("❌ An unexpected error occurred while processing your /exam_countdown command.")
+            except Exception:
+                pass
 
 @bot.tree.command(name="remove_exam", description="Remove an exam from countdown")
 @app_commands.describe(exam_name="Name of the exam to remove")
