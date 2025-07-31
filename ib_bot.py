@@ -284,11 +284,11 @@ async def on_message(message):
     # This prevents the prefix errors
     pass
 
-# Focus Mode Commands
-@bot.tree.command(name="focus", description="Start a focus session (duration in minutes)")
+# Lock In Mode Commands (changed from focus)
+@bot.tree.command(name="lockin", description="Start a lock in session (duration in minutes)")
 @app_commands.describe(
     duration="Duration in minutes (max 480)",
-    mode="Choose focus mode type"
+    mode="Choose lock in mode type"
 )
 @app_commands.choices(mode=[
     app_commands.Choice(name="Deep Focus", value="deep"),
@@ -305,21 +305,21 @@ async def on_message(message):
     app_commands.Choice(name="Economics", value="economics"),
     app_commands.Choice(name="Business", value="business"),
 ])
-async def focus_start(interaction: discord.Interaction, duration: int, mode: str = "deep"):
+async def lockin_start(interaction: discord.Interaction, duration: int, mode: str = "deep"):
     """
-    Start a focus session
+    Start a lock in session
     duration: Duration in minutes
-    mode: Focus mode type (deep, study_group, subject)
+    mode: Lock in mode type (deep, study_group, subject)
     """
     user_id = interaction.user.id
     guild = interaction.guild
     
     if user_id in focus_sessions:
-        await interaction.response.send_message("❌ You're already in a focus session! Use `/unfocus` to end it first.", ephemeral=True)
+        await interaction.response.send_message("❌ You're already in a lock in session! Use `/unlock` to end it first.", ephemeral=True)
         return
     
     if duration > 480:  # 8 hours max
-        await interaction.response.send_message("❌ Focus sessions cannot exceed 8 hours (480 minutes).", ephemeral=True)
+        await interaction.response.send_message("❌ Lock in sessions cannot exceed 8 hours (480 minutes).", ephemeral=True)
         return
     
     # Create or get focus role
@@ -331,7 +331,7 @@ async def focus_start(interaction: discord.Interaction, duration: int, mode: str
     #         focus_role = await guild.create_role(
     #             name=focus_role_name,
     #             color=discord.Color.red(),
-    #             reason="Focus mode role creation"
+    #             reason="Lock in mode role creation"
     #         )
     #     except discord.Forbidden:
     #         await interaction.response.send_message("❌ I don't have permission to create roles.", ephemeral=True)
@@ -342,7 +342,7 @@ async def focus_start(interaction: discord.Interaction, duration: int, mode: str
     
     # Add role to user
     try:
-        await interaction.user.add_roles(focus_role, reason=f"Focus session started for {duration} minutes")
+        await interaction.user.add_roles(focus_role, reason=f"Lock in session started for {duration} minutes")
     except discord.Forbidden:
         await interaction.response.send_message("❌ I don't have permission to assign roles.", ephemeral=True)
         return
@@ -371,20 +371,20 @@ async def focus_start(interaction: discord.Interaction, duration: int, mode: str
     
     await interaction.response.send_message(embed=embed)
 
-@bot.tree.command(name="unfocus", description="Request to end your current focus session (admin approval required)")
-async def unfocus(interaction: discord.Interaction):
-    """Request to end the current focus session (admin approval required)"""
+@bot.tree.command(name="unlock", description="Request to end your current lock in session (admin approval required)")
+async def unlock(interaction: discord.Interaction):
+    """Request to end the current lock in session (admin approval required)"""
     user_id = interaction.user.id
     guild = interaction.guild
     admin_role = discord.utils.get(guild.roles, name="Admins")
     if user_id not in focus_sessions:
-        await interaction.response.send_message("❌ You're not currently in a focus session.", ephemeral=False)
+        await interaction.response.send_message("❌ You're not currently in a lock in session.", ephemeral=False)
         return
 
     session_data = focus_sessions[user_id]
     user = interaction.user
 
-    class ConfirmUnfocusView(discord.ui.View):
+    class ConfirmUnlockView(discord.ui.View):
         def __init__(self, target_user, timeout=120):
             super().__init__(timeout=timeout)
             self.target_user = target_user
@@ -402,7 +402,7 @@ async def unfocus(interaction: discord.Interaction):
             session_data = focus_sessions.get(self.target_user.id)
             if session_data:
                 try:
-                    await self.target_user.remove_roles(session_data['role'], reason="Focus session ended by admin approval")
+                    await self.target_user.remove_roles(session_data['role'], reason="Lock in session ended by admin approval")
                 except discord.Forbidden:
                     pass
                 started_time = session_data['end_time'] - timedelta(minutes=session_data['duration'])
@@ -410,8 +410,8 @@ async def unfocus(interaction: discord.Interaction):
                 actual_minutes = int(actual_duration.total_seconds() / 60)
                 del focus_sessions[self.target_user.id]
                 embed = discord.Embed(
-                    title="✅ Focus Session Ended (Admin Confirmed)",
-                    description=f"{self.target_user.mention}'s focus session has been ended by {button_interaction.user.mention} (admin).\nGreat work! You focused for **{actual_minutes} minutes**.",
+                    title="✅ Lock In Session Ended (Admin Confirmed)",
+                    description=f"{self.target_user.mention}'s lock in session has been ended by {button_interaction.user.mention} (admin).\nGreat work! You were locked in for **{actual_minutes} minutes**.",
                     color=discord.Color.green()
                 )
                 embed.add_field(
@@ -422,22 +422,22 @@ async def unfocus(interaction: discord.Interaction):
                 embed.set_footer(text="Keep up the great work! 🌟")
                 await button_interaction.response.edit_message(embed=embed, view=None)
             else:
-                await button_interaction.response.edit_message(content="❌ No active focus session found.", view=None)
+                await button_interaction.response.edit_message(content="❌ No active lock in session found.", view=None)
             self.stop()
 
         @discord.ui.button(label="Refuse", style=discord.ButtonStyle.red)
         async def refuse(self, button_interaction: discord.Interaction, button: discord.ui.Button):
             embed = discord.Embed(
-                title="❌ Unfocus Request Refused",
-                description=f"{self.target_user.mention}'s request to end their focus session was refused by {button_interaction.user.mention} (admin).",
+                title="❌ Unlock Request Refused",
+                description=f"{self.target_user.mention}'s request to end their lock in session was refused by {button_interaction.user.mention} (admin).",
                 color=discord.Color.red()
             )
             await button_interaction.response.edit_message(embed=embed, view=None)
             self.stop()
 
     embed = discord.Embed(
-        title="⚠️ Unfocus Request Pending",
-        description=f"{user.mention} has requested to end their focus session.\n\n**An admin must approve or refuse this request below.**",
+        title="⚠️ Unlock Request Pending",
+        description=f"{user.mention} has requested to end their lock in session.\n\n**An admin must approve or refuse this request below.**",
         color=discord.Color.orange()
     )
     embed.add_field(
@@ -446,16 +446,16 @@ async def unfocus(interaction: discord.Interaction):
         inline=False
     )
     embed.set_footer(text="Only admins can approve or refuse this request.")
-    view = ConfirmUnfocusView(user)
+    view = ConfirmUnlockView(user)
     await interaction.response.send_message(embed=embed, view=view, ephemeral=False)
 
-@bot.tree.command(name="focus_status", description="Check your current focus session status")
-async def focus_status(interaction: discord.Interaction):
-    """Check focus session status"""
+@bot.tree.command(name="lockin_status", description="Check your current lock in session status")
+async def lockin_status(interaction: discord.Interaction):
+    """Check lock in session status"""
     user_id = interaction.user.id
     
     if user_id not in focus_sessions:
-        await interaction.response.send_message("❌ You're not currently in a focus session.", ephemeral=True)
+        await interaction.response.send_message("❌ You're not currently in a lock in session.", ephemeral=True)
         return
     
     session_data = focus_sessions[user_id]
@@ -463,21 +463,21 @@ async def focus_status(interaction: discord.Interaction):
     time_remaining = end_time - datetime.now()
     
     if time_remaining.total_seconds() <= 0:
-        await interaction.response.send_message("⏰ Your focus session has ended! Use `/unfocus` to complete it.", ephemeral=True)
+        await interaction.response.send_message("⏰ Your lock in session has ended! Use `/unlock` to complete it.", ephemeral=True)
         return
     
     minutes_remaining = int(time_remaining.total_seconds() / 60)
     
     embed = discord.Embed(
-        title="🎯 Focus Session Status",
+        title="🎯 Lock In Session Status",
         description=f"**Time Remaining:** {minutes_remaining} minutes\n**Ends at:** <t:{int(end_time.timestamp())}:t>\n**Mode:** {session_data['mode'].title()}",
         color=discord.Color.red()
     )
     
     await interaction.response.send_message(embed=embed, ephemeral=True)
 
-@bot.tree.command(name="focus_list", description="Show all users currently Locked In")
-async def focus_list(interaction: discord.Interaction):
+@bot.tree.command(name="lockin_list", description="Show all users currently Locked In")
+async def lockin_list(interaction: discord.Interaction):
     """Show all users currently Locked In"""
     if not focus_sessions:
         embed = discord.Embed(
@@ -512,7 +512,7 @@ async def focus_list(interaction: discord.Interaction):
             })
     
     if not active_sessions:
-        embed.description = "No active focus sessions found."
+        embed.description = "No active lock in sessions found."
     else:
         # Sort by time remaining (shortest first)
         active_sessions.sort(key=lambda x: x['minutes_remaining'])
@@ -1154,7 +1154,7 @@ async def ahhhh(interaction: discord.Interaction):
         if not member.bot:
             try:
                 await member.add_roles(focus_role, reason="AHHHH command used by admin")
-                # Set up a focus session for 480 minutes for each user
+                # Set up a lock in session for 480 minutes for each user
                 end_time = datetime.now() + timedelta(minutes=480)
                 focus_sessions[member.id] = {
                     'end_time': end_time,
@@ -1309,7 +1309,7 @@ async def update_resources_message(guild):
 # Background Tasks
 @tasks.loop(minutes=1)
 async def check_focus_sessions():
-    """Check for expired focus sessions"""
+    """Check for expired lock in sessions"""
     current_time = datetime.now()
     expired_sessions = []
     
@@ -1321,20 +1321,20 @@ async def check_focus_sessions():
         session_data = focus_sessions[user_id]
         user = session_data['user']
         
-        # Remove focus session role
+        # Remove lock in session role
         try:
-            await user.remove_roles(session_data['role'], reason="Focus session completed")
+            await user.remove_roles(session_data['role'], reason="Lock in session completed")
         except:
             pass
         
         # Send completion message
         try:
             embed = discord.Embed(
-                title="⏰ Focus Session Complete!",
-                description=f"Your **{session_data['duration']}-minute** focus session has ended.\n\nGreat work! 🌟",
+                title="⏰ Lock In Session Complete!",
+                description=f"Your **{session_data['duration']}-minute** lock in session has ended.\n\nGreat work! 🌟",
                 color=discord.Color.green()
             )
-            embed.set_footer(text="Ready for another session? Use /focus to start again!")
+            embed.set_footer(text="Ready for another session? Use /lockin to start again!")
             await user.send(embed=embed)
         except:
             pass
